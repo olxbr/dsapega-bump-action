@@ -1,8 +1,8 @@
 name: Black Box Action
 description: Action to retrieve metadata information from repository.
 inputs:
-  configs:
-    description: Action configs in json format.
+  config:
+    description: Action configuration in JSON format.
     required: true
 runs:
   using: 'composite'
@@ -10,5 +10,5 @@ runs:
     - uses: actions/setup-python@v3
       with:
         python-version: '3.9.12'
-    - run: python ${{ github.action_path }}/src/entrypoint.py -c '${{ inputs.configs }}'
+    - run: python ${{ github.action_path }}/src/entrypoint.py -c '${{ inputs.config }}'
       shell: bash
