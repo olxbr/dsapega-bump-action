@@ -8,3 +8,4 @@ pytest
 coverage
 GitPython
 freezegun
+tqdm
