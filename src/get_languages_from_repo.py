@@ -104,11 +104,31 @@ def get_files_by_regex(regex: str = r"(.*?)", dir_to_check: str = "."):
     return filtered_files
 
 
-def try_build_docker(path: str = '.'):
+def login_in_docker(token: str, registry: str) -> None:
+    log.info(f"Loging in {registry}")
+    try:
+        log.debug("Trying docker login")
+        process = subprocess.run(
+                f'echo "{token}" | docker login --username AWS --password-stdin {registry}',
+                shell=True,
+                capture_output=True
+        )
+        log.debug("Login in docker successfull")
+        if process.returncode != 0:
+            log.warning("Failed to login in the docker registry")
+            raise ChildProcessError()
+    except ChildProcessError:
+        return None
+
+
+def try_build_docker(path: str = '.', **kwargs) -> list:
     log.info(f"Searching for Dockerfiles in {path}")
+    token = kwargs.get('docker_token', '')
+    registry = kwargs.get('docker_registry', '')
     paths = get_files_by_regex(regex=r".*Dockerfile*", dir_to_check=path)
     log.debug(f"Found {len(paths)} Dockerfiles")
     image_names = []
+    login_in_docker(token, registry)
     for index, dockerfile_file in enumerate(paths):
         try:
             log.debug(f"Building image from path: {path}")
@@ -144,7 +164,7 @@ def get_syft_for_dockerfiles(image_names: list = []):
     return components
 
 
-def get_syft_sbom(path: str = '.') -> dict:
+def get_syft_sbom(path: str = '.', **kwargs) -> dict:
     log.info("Getting SBOM with syft")
     process = subprocess.run(
             f"syft {path} -o cyclonedx-json",
@@ -161,7 +181,7 @@ def get_syft_sbom(path: str = '.') -> dict:
             raise IndexError
     except IndexError:
         log.warning("SBOM with syft failed new attempt with docker will start soon")
-        image_names = try_build_docker(path)
+        image_names = try_build_docker(path, **kwargs)
         process_output = get_syft_for_dockerfiles(image_names)
     return process_output['components']
 
@@ -241,7 +261,7 @@ def process(repo: str, token: str, default_branch: str, role: str, verbose: bool
     TOKEN = token
     age, cr = get_repo_metadata(repo)
     log.info(f"The AGE is: {age}, The CR is: {cr}")
-    syft_output = get_syft_sbom('.')
+    syft_output = get_syft_sbom('.', **kwargs)
     log.info(f"Found {len(syft_output)} metadatas with syft")
     languages = get_repo_languages(repo)
     log.info(f"This languages where found in the repo: {languages}")

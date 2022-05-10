@@ -22,8 +22,12 @@ def main():
 
     repo = os.getenv('REPO_NAME', 'no-name')
     log.info(f'REPO: {repo}')
+
     default_branch = os.getenv('DEFAULT_BRANCH', 'main')
     log.info(f'DEFAULT_BRANCH {default_branch}')
+
+    docker_token = os.getenv('DOCKER_TOKEN', '')
+    log.info('DOCKER TOKEN STATUS: acquired')
 
     log.info('The SBOM process will begin')
     get_languages_from_repo.process(
@@ -32,6 +36,8 @@ def main():
         default_branch=default_branch,
         verbose=False,
         bucket=configs['s3-bucket'],
+        docker_token=docker_token,
+        docker_registry=configs['ecr-registry']
     )
     log.info('Process finished! Bye :)')
 
