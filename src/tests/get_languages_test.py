@@ -1,10 +1,12 @@
 import datetime
 import unittest
+import boto3
 from git import GitCommandError
 
 from unittest.mock import patch
 from unittest import mock
 from freezegun import freeze_time
+from moto import mock_s3, mock_sts
 
 import get_languages_from_repo
 
@@ -106,6 +108,19 @@ class GetLangauges(unittest.TestCase):
 
         self.assertEqual(cr, 0.3)
         self.assertEqual(age, 1.0)
+
+    @mock_s3
+    @mock_sts
+    def test_load_to_s3_with_assume_role(self):
+        repo = 'tech-radar'
+        json_data = '{"foo": "bar"}'
+        bucket = 'blackbox'
+        role = 'arn:aws:iam::000000000000:role/blackbox'
+
+        conn = boto3.resource('s3', region_name='us-east-1')
+        conn.create_bucket(Bucket='blackbox')
+
+        get_languages_from_repo.load_to_s3(repo, json_data, bucket, role)
 
     def test_compressor(self):
         expected_output = {
