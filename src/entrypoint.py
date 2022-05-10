@@ -22,6 +22,7 @@ def main():
             repo=repo,
             token=configs['token'],
             default_branch=default_branch,
+            role=configs['role'],
             verbose=False,
             bucket=configs['s3-bucket'],
         )
