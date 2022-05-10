@@ -20,7 +20,7 @@ def main():
     configs = json.loads(cfg)
     log.info(f'Found this keys in the config variable {configs.keys()}')
 
-    repo = os.getenv('GITHUB_ACTION_REPOSITORY', 'no-name')
+    repo = os.getenv('REPO_NAME', 'no-name')
     log.info(f'REPO: {repo}')
     default_branch = os.getenv('DEFAULT_BRANCH', 'main')
     log.info(f'DEFAULT_BRANCH {default_branch}')
