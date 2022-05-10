@@ -1,18 +1,18 @@
-import json
-import os
-import logging
-import datetime
 import boto3
 import click
-import subprocess
+import datetime
+import json
+import logging
+import os
 import re
+import subprocess
 
-
-from gh_api_requester import GHAPIRequests
 from git import Repo, GitCommandError
 
+from gh_api_requester import GHAPIRequests
+
 log = logging.getLogger(__name__)
-logging.basicConfig(level=os.environ.get("LOGLEVEL", "DEBUG"))
+logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
 
 requester = GHAPIRequests()
 repo = Repo()
