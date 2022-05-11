@@ -45,7 +45,7 @@ def get_repo_languages(repo: str) -> dict:
 def get_repo_age_commit_based() -> float:
     log.debug('Getting age commit based')
     try:
-        commits = list(repo.iter_commits(DEFAULT_BRANCH))
+        commits = list(repo.iter_commits(DEFAULT_BRANCH))  # TODO adicionar opção de `all` no itercommits
         last_commit_datetime = commits[-1].committed_datetime
     except GitCommandError:
         return 0.0

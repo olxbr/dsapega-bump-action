@@ -4,7 +4,6 @@ import json
 import logging
 import os
 
-from tqdm.contrib.logging import logging_redirect_tqdm
 
 log = logging.getLogger(__name__)
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
@@ -32,6 +31,12 @@ def main():
     docker_registry = os.getenv('DOCKER_REGISTRY', '')
     log.info('DOCKER TOKEN STATUS: acquired')
 
+    access_key_id = os.getenv('AWS_ACCESS_KEY_ID', '')
+    secret_access_key = os.getenv('AWS_SECRET_ACCESS_KEY', '')
+    log.info('AWS KEYS: acquired')
+
+    log.info('DOCKER TOKEN STATUS: acquired')
+
     log.info('The SBOM process will begin')
     get_languages_from_repo.process(
         repo=repo,
@@ -41,10 +46,11 @@ def main():
         bucket=configs['s3-bucket'],
         docker_token=docker_token,
         docker_registry=docker_registry,
+        access_key_id=access_key_id,
+        secret_access_Key=secret_access_key,
     )
     log.info('Process finished! Bye :)')
 
 
 if __name__ == '__main__':
-    with logging_redirect_tqdm():
-        main()
+    main()
