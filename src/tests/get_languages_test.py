@@ -155,7 +155,7 @@ class GetLangauges(unittest.TestCase):
 
         for obj in s3_bucket.objects.all():
             key = obj.key
-            print(key)
+            # YYYY-MM-DD-<REPO_NAME>-<HASH>.json
             self.assertRegex(key, r'\d{4}-\d{2}-\d{2}-[-\w]+-\d{19}.json$')
 
     def test_compressor(self):
