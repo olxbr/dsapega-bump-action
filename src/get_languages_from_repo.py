@@ -201,8 +201,13 @@ def compressor(repo: str = '', **kwargs) -> dict:
     return structure
 
 
-def load_to_s3(repo: str, json_data: dict, bucket: str) -> None:
+def load_to_s3(repo: str, json_data: dict, bucket: str, role: str) -> None:
     s3 = boto3.resource('s3')
+    sts = boto3.client('sts')
+    assume_role_response = sts.assume_role(
+        RoleArn=role,
+        RoleSessionName='blackbox-actions',
+    )
     json_obj = json.dumps(json_data).encode('UTF-8')
     json_hash = hash(json_obj)
     date = datetime.datetime.now().strftime('%Y-%M-%d')
@@ -224,7 +229,7 @@ def load_local(repo: str, json_data: dict) -> None:
         json.dump(json_data, f, ensure_ascii=False, indent=4)
 
 
-def process(repo: str, token: str, default_branch: str, verbose: bool, **kwargs):
+def process(repo: str, token: str, default_branch: str, role: str, verbose: bool, **kwargs):
     global TOKEN
 
     bucket = kwargs.get('bucket', 'devtools-test')
@@ -249,7 +254,7 @@ def process(repo: str, token: str, default_branch: str, verbose: bool, **kwargs)
     )
 
     load_local(repo, sbom_data)
-    load_to_s3(repo, sbom_data, bucket)
+    load_to_s3(repo, sbom_data, bucket, role)
     return sbom_data
 
 
