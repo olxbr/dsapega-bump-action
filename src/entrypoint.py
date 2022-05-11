@@ -26,7 +26,10 @@ def main():
     default_branch = os.getenv('DEFAULT_BRANCH', 'main')
     log.info(f'DEFAULT_BRANCH {default_branch}')
 
-    docker_token = os.getenv('DOCKER_TOKEN', '')
+    docker_token = os.getenv('DOCKER_ECR_PASSWORD', '')
+    log.info('DOCKER TOKEN STATUS: acquired')
+
+    docker_registry = os.getenv('DOCKER_REGISTRY', '')
     log.info('DOCKER TOKEN STATUS: acquired')
 
     log.info('The SBOM process will begin')
@@ -37,7 +40,7 @@ def main():
         verbose=False,
         bucket=configs['s3-bucket'],
         docker_token=docker_token,
-        docker_registry=configs['ecr-registry']
+        docker_registry=docker_registry,
     )
     log.info('Process finished! Bye :)')
 

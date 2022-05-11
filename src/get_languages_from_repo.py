@@ -113,10 +113,10 @@ def login_in_docker(token: str, registry: str) -> None:
                 shell=True,
                 capture_output=True
         )
-        log.debug("Login in docker successfull")
         if process.returncode != 0:
             log.warning("Failed to login in the docker registry")
             raise ChildProcessError()
+        log.debug("Login in docker successfull")
     except ChildProcessError:
         return None
 
