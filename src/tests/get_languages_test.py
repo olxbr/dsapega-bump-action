@@ -1,6 +1,7 @@
 import datetime
 import unittest
 import boto3
+import botocore
 from git import GitCommandError
 
 from unittest.mock import patch
@@ -111,7 +112,36 @@ class GetLangauges(unittest.TestCase):
 
     @mock_s3
     @mock_sts
-    def test_load_to_s3_with_assume_role(self):
+    def test_load_to_s3_with_assume_role_throws_exception_if_bucket_doesnt_exist(self):
+        repo = 'tech-radar'
+        json_data = '{"foo": "bar"}'
+        bucket = 'blackbox'
+        role = 'arn:aws:iam::000000000000:role/blackbox'
+
+        with self.assertRaises(Exception) as context:
+            get_languages_from_repo.load_to_s3(repo, json_data, bucket, role)
+
+        self.assertTrue('NoSuchBucket' in str(context.exception))
+
+    @mock_s3
+    @mock_sts
+    def test_load_to_s3_with_assume_role_throws_exception_if_role_is_invalid(self):
+        repo = 'tech-radar'
+        json_data = '{"foo": "bar"}'
+        bucket = 'blackbox'
+        role = ''
+
+        conn = boto3.resource('s3', region_name='us-east-1')
+        conn.create_bucket(Bucket='blackbox')
+
+        with self.assertRaises(Exception) as context:
+            get_languages_from_repo.load_to_s3(repo, json_data, bucket, role)
+
+        self.assertTrue('Parameter validation failed' in str(context.exception))
+
+    @mock_s3
+    @mock_sts
+    def test_load_to_s3_pushes_to_s3(self):
         repo = 'tech-radar'
         json_data = '{"foo": "bar"}'
         bucket = 'blackbox'
@@ -119,8 +149,14 @@ class GetLangauges(unittest.TestCase):
 
         conn = boto3.resource('s3', region_name='us-east-1')
         conn.create_bucket(Bucket='blackbox')
+        s3_bucket = conn.Bucket('blackbox')
 
         get_languages_from_repo.load_to_s3(repo, json_data, bucket, role)
+
+        for obj in s3_bucket.objects.all():
+            key = obj.key
+            print(key)
+            self.assertRegex(key, r'\d{4}-\d{2}-\d{2}-[-\w]+-\d{19}.json$')
 
     def test_compressor(self):
         expected_output = {
