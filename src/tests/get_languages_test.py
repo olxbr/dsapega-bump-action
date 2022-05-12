@@ -117,9 +117,10 @@ class GetLangauges(unittest.TestCase):
         json_data = '{"foo": "bar"}'
         bucket = 'blackbox'
         role = 'arn:aws:iam::000000000000:role/blackbox'
+        ext_id = '00000000-0000-0000-0000-000000000000'
 
         with self.assertRaises(Exception) as context:
-            get_languages_from_repo.load_to_s3(repo, json_data, bucket, role)
+            get_languages_from_repo.load_to_s3(repo, json_data, bucket, role, ext_id)
 
         self.assertTrue('NoSuchBucket' in str(context.exception))
 
@@ -130,12 +131,13 @@ class GetLangauges(unittest.TestCase):
         json_data = '{"foo": "bar"}'
         bucket = 'blackbox'
         role = ''
+        ext_id = ''
 
         conn = boto3.resource('s3', region_name='us-east-1')
         conn.create_bucket(Bucket='blackbox')
 
         with self.assertRaises(Exception) as context:
-            get_languages_from_repo.load_to_s3(repo, json_data, bucket, role)
+            get_languages_from_repo.load_to_s3(repo, json_data, bucket, role, ext_id)
 
         self.assertTrue('Parameter validation failed' in str(context.exception))
 
@@ -146,12 +148,13 @@ class GetLangauges(unittest.TestCase):
         json_data = '{"foo": "bar"}'
         bucket = 'blackbox'
         role = 'arn:aws:iam::000000000000:role/blackbox'
+        ext_id = '00000000-0000-0000-0000-000000000000'
 
         conn = boto3.resource('s3', region_name='us-east-1')
         conn.create_bucket(Bucket='blackbox')
         s3_bucket = conn.Bucket('blackbox')
 
-        get_languages_from_repo.load_to_s3(repo, json_data, bucket, role)
+        get_languages_from_repo.load_to_s3(repo, json_data, bucket, role, ext_id)
 
         for obj in s3_bucket.objects.all():
             key = obj.key

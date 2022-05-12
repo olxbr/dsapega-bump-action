@@ -45,6 +45,7 @@ def main():
         verbose=False,
         bucket=configs['s3-bucket'],
         role=configs['s3-role-arn'],
+        external_id=configs['s3-role-external-id'],
         docker_token=docker_token,
         docker_registry=docker_registry,
         access_key_id=access_key_id,

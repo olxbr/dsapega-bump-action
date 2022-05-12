@@ -221,12 +221,19 @@ def compressor(repo: str = '', **kwargs) -> dict:
     return structure
 
 
-def load_to_s3(repo: str, json_data: dict, bucket: str, role: str) -> None:
-    s3 = boto3.resource('s3')
+def load_to_s3(repo: str, json_data: dict, bucket: str, role: str, ext_id: str) -> None:
     sts = boto3.client('sts')
     assume_role_response = sts.assume_role(
         RoleArn=role,
         RoleSessionName='blackbox-actions',
+        ExternalId=ext_id,
+    )
+    credentials = assume_role_response['Credentials']
+    s3 = boto3.resource(
+        's3',
+        aws_access_key_id=credentials['AccessKeyId'],
+        aws_secret_access_key=credentials['SecretAccessKey'],
+        aws_session_token=credentials['SessionToken'],
     )
     json_obj = json.dumps(json_data).encode('UTF-8')
     json_hash = hash(json_obj)
@@ -273,8 +280,9 @@ def process(repo: str, token: str, default_branch: str, role: str, verbose: bool
             packages=syft_output,
     )
 
+    ext_id = kwargs.get('external_id', '')
     load_local(repo, sbom_data)
-    load_to_s3(repo, sbom_data, bucket, role)
+    load_to_s3(repo, sbom_data, bucket, role, ext_id)
     return sbom_data
 
 
