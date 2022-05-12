@@ -44,6 +44,7 @@ def main():
         default_branch=default_branch,
         verbose=False,
         bucket=configs['s3-bucket'],
+        role=configs['s3-role-arn'],
         docker_token=docker_token,
         docker_registry=docker_registry,
         access_key_id=access_key_id,
