@@ -1,18 +1,18 @@
-import json
-import os
-import logging
-import datetime
 import boto3
 import click
-import subprocess
+import datetime
+import json
+import logging
+import os
 import re
+import subprocess
 
-
-from gh_api_requester import GHAPIRequests
 from git import Repo, GitCommandError
 
+from gh_api_requester import GHAPIRequests
+
 log = logging.getLogger(__name__)
-logging.basicConfig(level=os.environ.get("LOGLEVEL", "DEBUG"))
+logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
 
 requester = GHAPIRequests()
 repo = Repo()
@@ -45,7 +45,7 @@ def get_repo_languages(repo: str) -> dict:
 def get_repo_age_commit_based() -> float:
     log.debug('Getting age commit based')
     try:
-        commits = list(repo.iter_commits(DEFAULT_BRANCH))
+        commits = list(repo.iter_commits(DEFAULT_BRANCH, all=True))
         last_commit_datetime = commits[-1].committed_datetime
     except GitCommandError:
         return 0.0
@@ -104,11 +104,31 @@ def get_files_by_regex(regex: str = r"(.*?)", dir_to_check: str = "."):
     return filtered_files
 
 
-def try_build_docker(path: str = '.'):
+def login_in_docker(token: str, registry: str) -> None:
+    log.info(f"Loging in {registry}")
+    try:
+        log.debug("Trying docker login")
+        process = subprocess.run(
+                f'echo "{token}" | docker login --username AWS --password-stdin {registry}',
+                shell=True,
+                capture_output=True
+        )
+        if process.returncode != 0:
+            log.warning("Failed to login in the docker registry")
+            raise ChildProcessError()
+        log.debug("Login in docker successfull")
+    except ChildProcessError:
+        return None
+
+
+def try_build_docker(path: str = '.', **kwargs) -> list:
     log.info(f"Searching for Dockerfiles in {path}")
+    token = kwargs.get('docker_token', '')
+    registry = kwargs.get('docker_registry', '')
     paths = get_files_by_regex(regex=r".*Dockerfile*", dir_to_check=path)
     log.debug(f"Found {len(paths)} Dockerfiles")
     image_names = []
+    login_in_docker(token, registry)
     for index, dockerfile_file in enumerate(paths):
         try:
             log.debug(f"Building image from path: {path}")
@@ -144,7 +164,7 @@ def get_syft_for_dockerfiles(image_names: list = []):
     return components
 
 
-def get_syft_sbom(path: str = '.') -> dict:
+def get_syft_sbom(path: str = '.', **kwargs) -> dict:
     log.info("Getting SBOM with syft")
     process = subprocess.run(
             f"syft {path} -o cyclonedx-json",
@@ -161,7 +181,7 @@ def get_syft_sbom(path: str = '.') -> dict:
             raise IndexError
     except IndexError:
         log.warning("SBOM with syft failed new attempt with docker will start soon")
-        image_names = try_build_docker(path)
+        image_names = try_build_docker(path, **kwargs)
         process_output = get_syft_for_dockerfiles(image_names)
     return process_output['components']
 
@@ -201,12 +221,19 @@ def compressor(repo: str = '', **kwargs) -> dict:
     return structure
 
 
-def load_to_s3(repo: str, json_data: dict, bucket: str, role: str) -> None:
-    s3 = boto3.resource('s3')
+def load_to_s3(repo: str, json_data: dict, bucket: str, role: str, ext_id: str) -> None:
     sts = boto3.client('sts')
     assume_role_response = sts.assume_role(
         RoleArn=role,
         RoleSessionName='blackbox-actions',
+        ExternalId=ext_id,
+    )
+    credentials = assume_role_response['Credentials']
+    s3 = boto3.resource(
+        's3',
+        aws_access_key_id=credentials['AccessKeyId'],
+        aws_secret_access_key=credentials['SecretAccessKey'],
+        aws_session_token=credentials['SessionToken'],
     )
     json_obj = json.dumps(json_data).encode('UTF-8')
     json_hash = hash(json_obj)
@@ -241,7 +268,7 @@ def process(repo: str, token: str, default_branch: str, role: str, verbose: bool
     TOKEN = token
     age, cr = get_repo_metadata(repo)
     log.info(f"The AGE is: {age}, The CR is: {cr}")
-    syft_output = get_syft_sbom('.')
+    syft_output = get_syft_sbom('.', **kwargs)
     log.info(f"Found {len(syft_output)} metadatas with syft")
     languages = get_repo_languages(repo)
     log.info(f"This languages where found in the repo: {languages}")
@@ -253,8 +280,9 @@ def process(repo: str, token: str, default_branch: str, role: str, verbose: bool
             packages=syft_output,
     )
 
+    ext_id = kwargs.get('external_id', '')
     load_local(repo, sbom_data)
-    load_to_s3(repo, sbom_data, bucket, role)
+    load_to_s3(repo, sbom_data, bucket, role, ext_id)
     return sbom_data
 
 
