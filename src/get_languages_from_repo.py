@@ -243,7 +243,7 @@ def load_to_s3(repo: str, json_data: dict, bucket: str, role: str, ext_id: str) 
             f'/tmp/{date}-{repo}-{json_hash}.json'
     )
     s3object.put(
-                Body=(bytes())
+                Body=(json_obj)
     )
 
 
