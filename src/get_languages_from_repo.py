@@ -76,7 +76,7 @@ def get_repo_commit_rate(default_branch: str = 'main') -> float:
 
 
 def get_repo_metadata(repo: str, default_branch: str) -> str:
-    log.info(f'Getting Repository Metadata: {repo}')
+    log.info(f'Getting Repository Metadata: {repo}:{default_branch}')
     age_in_months = get_repo_age_commit_based(default_branch)
     commit_rate = get_repo_commit_rate(default_branch)
     return age_in_months, commit_rate
@@ -140,7 +140,7 @@ def try_build_docker(path: str = '.', **kwargs) -> list:
             )
             log.debug(f"Image syft_image_build:{index} successfully built")
             if process.returncode != 0:
-                log.debug(f"Image syft_image_build:{index} failed to build")
+                log.warning(f"Image syft_image_build:{index} failed to build")
                 raise ChildProcessError()
             image_names.append(f"syft_image_build:index{index}")
         except ChildProcessError:
@@ -152,13 +152,14 @@ def get_syft_for_dockerfiles(image_names: list = []):
     log.info("Getting SBOM with syft through Docker")
     components = {'components': []}
     for image in image_names:
+        log.debug(f"Running syft against: {image}")
         process = subprocess.run(
                 f"syft {image} -o cyclonedx-json",
                 shell=True,
                 capture_output=True
         )
         if process.returncode != 0:
-            log.debug("Syft got erorr while reading image, skipping this image")
+            log.warning("Syft got erorr while reading image, skipping this image")
             raise ChildProcessError()
         process_output = json.loads(process.stdout)
         components['components'] += process_output['components']
@@ -188,12 +189,13 @@ def get_syft_sbom(path: str = '.', **kwargs) -> dict:
 
 
 def compressor(repo: str = '', **kwargs) -> dict:
+    log.info('Compressing data in a json objetc')
     age = kwargs.get('age', 0)
     cr = kwargs.get('commit_rate', 0)
     languages = kwargs.get('languages', {})
     packages = kwargs.get(
             'packages',
-            [{'type': None, 'name': 'not_a_pkg', 'version': 0.0, 'bom-ref': None}]
+            [{'type': None, 'name': 'not_a_pkg', 'version': None, 'bom-ref': None}]
     )
 
     structure = {
@@ -225,12 +227,14 @@ def compressor(repo: str = '', **kwargs) -> dict:
 
 
 def load_to_s3(repo: str, json_data: dict, bucket: str, role: str, ext_id: str) -> None:
+    log.info(f'Sendig SBOM to S3 to the bucket {bucket}')
     sts = boto3.client('sts')
     assume_role_response = sts.assume_role(
         RoleArn=role,
         RoleSessionName='blackbox-actions',
         ExternalId=ext_id,
     )
+    log.debug('Getting new credentials through sts:assumeRole')
     credentials = assume_role_response['Credentials']
     s3 = boto3.resource(
         's3',
@@ -238,6 +242,7 @@ def load_to_s3(repo: str, json_data: dict, bucket: str, role: str, ext_id: str) 
         aws_secret_access_key=credentials['SecretAccessKey'],
         aws_session_token=credentials['SessionToken'],
     )
+    log.debug('Converting and sending object')
     json_obj = json.dumps(json_data).encode('UTF-8')
     json_hash = hash(json_obj)
     date = datetime.datetime.now().strftime('%Y-%M-%d')
@@ -248,12 +253,13 @@ def load_to_s3(repo: str, json_data: dict, bucket: str, role: str, ext_id: str) 
     s3object.put(
                 Body=(json_obj)
     )
+    log.debug('Sending process finished')
 
 
 def load_local(repo: str, json_data: dict) -> None:
-
     json_obj = json.dumps(json_data).encode('UTF-8')
     json_hash = hash(json_obj)
+    log.debug(f'Saving local file (/tmp/{date}-{repo}-{json_hash}.json)')
     date = datetime.datetime.now().strftime('%Y-%M-%d')
     with open(f"/tmp/{date}-{repo}-{json_hash}.json", "w+", encoding='utf-8') as f:
         json.dump(json_data, f, ensure_ascii=False, indent=4)
@@ -282,17 +288,18 @@ def process(repo: str, token: str, default_branch: str, role: str, verbose: bool
             languages=languages,
             packages=syft_output,
     )
-
+    log.info("Sbom acquire process finished! Sending...")
     ext_id = kwargs.get('external_id', '')
     load_local(repo, sbom_data)
     load_to_s3(repo, sbom_data, bucket, role, ext_id)
+    log.info("Sbom proces finished! That's all folks")
     return sbom_data
 
 
 @click.command()
 @click.option('--repo', help='The repository')
 @click.option('--token', help='The gh token')
-@click.option('--DEFAULT_BRANCH', help='The default_branch')
+@click.option('--default_branch', help='The default_branch')
 @click.option('--verbose', default=False, help='The default_branch')
 def click_callback(repo: str = '', token: str = '', default_branch: str = 'main', verbose: bool = True):
     process(

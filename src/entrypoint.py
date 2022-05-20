@@ -23,13 +23,13 @@ def main():
     log.info(f'REPO: {repo}')
 
     default_branch = os.getenv('DEFAULT_BRANCH', 'main')
-    log.info(f'DEFAULT_BRANCH {default_branch}')
+    log.info(f'DEFAULT_BRANCH: {default_branch}')
 
     docker_token = os.getenv('DOCKER_ECR_PASSWORD', '')
     log.info('DOCKER TOKEN STATUS: acquired')
 
     docker_registry = os.getenv('DOCKER_REGISTRY', '')
-    log.info('DOCKER TOKEN STATUS: acquired')
+    log.info('DOCKER REGISTRY STATUS: acquired')
 
     access_key_id = os.getenv('AWS_ACCESS_KEY_ID', '')
     secret_access_key = os.getenv('AWS_SECRET_ACCESS_KEY', '')
