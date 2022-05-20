@@ -21,7 +21,6 @@ TOKEN = os.getenv('GH_TOKEN', '')
 INTERVAL = 180  # Three months
 COMMIT_RATE_INTERVAL = 30  # Calculate commit rate per month
 BASE_URL = "https://api.github.com"
-DEFAULT_BRANCH = "main"
 
 
 def get_repo_languages(repo: str) -> dict:
@@ -42,12 +41,13 @@ def get_repo_languages(repo: str) -> dict:
     return data
 
 
-def get_repo_age_commit_based() -> float:
-    log.debug('Getting age commit based')
+def get_repo_age_commit_based(default_branch: str = 'main') -> float:
+    log.debug(f'Getting age commit based... branch: {default_branch}')
     try:
-        commits = list(repo.iter_commits(DEFAULT_BRANCH, all=True))
+        commits = list(repo.iter_commits(default_branch, all=True))
         last_commit_datetime = commits[-1].committed_datetime
     except GitCommandError:
+        log.warning(f'Failed to get age! Using default 0.0 (branch: {default_branch})')
         return 0.0
     age_in_months = round(
             (datetime.datetime.now(datetime.timezone.utc) - last_commit_datetime).days/30,
@@ -56,11 +56,12 @@ def get_repo_age_commit_based() -> float:
     return age_in_months
 
 
-def get_repo_commit_rate() -> float:
-    log.debug('Getting commit rate')
+def get_repo_commit_rate(default_branch: str = 'main') -> float:
+    log.debug(f'Getting commit rate... branch: {default_branch}')
     try:
-        commits = list(repo.iter_commits(DEFAULT_BRANCH))
+        commits = list(repo.iter_commits(default_branch))
     except GitCommandError:
+        log.warning(f'Failed to get CR! Using default 0.0 (branch: {default_branch})')
         return 0.0
     conter = 0
     month_ago = (
@@ -74,10 +75,10 @@ def get_repo_commit_rate() -> float:
     return conter / COMMIT_RATE_INTERVAL
 
 
-def get_repo_metadata(repo: str) -> str:
+def get_repo_metadata(repo: str, default_branch: str) -> str:
     log.info(f'Getting Repository Metadata: {repo}')
-    age_in_months = get_repo_age_commit_based()
-    commit_rate = get_repo_commit_rate()
+    age_in_months = get_repo_age_commit_based(default_branch)
+    commit_rate = get_repo_commit_rate(default_branch)
     return age_in_months, commit_rate
 
 
@@ -204,6 +205,7 @@ def compressor(repo: str = '', **kwargs) -> dict:
 
     for pkg in packages:
         try:
+            log.debug(f"Found {pkg['name']}:{pkg['type']}")
             pkg_structure = {
                     'name': pkg['name'],
                     'type': pkg['type'],
@@ -211,10 +213,11 @@ def compressor(repo: str = '', **kwargs) -> dict:
                     'bom-ref': pkg['bom-ref'],
             }
         except KeyError:
+            log.warning(f"The pkg {pkg['name']}:{pkg['type']} does not have a version or bom-ref")
             pkg_structure = {
                     'name': pkg['name'],
                     'type': pkg['type'],
-                    'version': pkg['version'],
+                    'version': None,
                     'bom-ref': None,
             }
         structure['packages'].append(pkg_structure)
@@ -266,7 +269,7 @@ def process(repo: str, token: str, default_branch: str, role: str, verbose: bool
         logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
 
     TOKEN = token
-    age, cr = get_repo_metadata(repo)
+    age, cr = get_repo_metadata(repo, default_branch)
     log.info(f"The AGE is: {age}, The CR is: {cr}")
     syft_output = get_syft_sbom('.', **kwargs)
     log.info(f"Found {len(syft_output)} metadatas with syft")
@@ -289,7 +292,7 @@ def process(repo: str, token: str, default_branch: str, role: str, verbose: bool
 @click.command()
 @click.option('--repo', help='The repository')
 @click.option('--token', help='The gh token')
-@click.option('--default_branch', help='The default_branch')
+@click.option('--DEFAULT_BRANCH', help='The default_branch')
 @click.option('--verbose', default=False, help='The default_branch')
 def click_callback(repo: str = '', token: str = '', default_branch: str = 'main', verbose: bool = True):
     process(

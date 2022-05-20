@@ -88,9 +88,9 @@ class GetLangauges(unittest.TestCase):
     @patch('get_languages_from_repo.repo')
     @freeze_time("2022-05-04")
     def test_get_repo_metadata_with_clean_tree(self, mock_repo):
-        mock_repo.iter_commits.side_effect = GitCommandError('git rev-list master --', 128)
+        mock_repo.iter_commits.side_effect = GitCommandError('git rev-list main --', 128)
 
-        age, cr = get_languages_from_repo.get_repo_metadata('tech-radar')
+        age, cr = get_languages_from_repo.get_repo_metadata('tech-radar', 'main')
 
         self.assertEqual(cr, 0.0)
         self.assertEqual(age, 0.0)
@@ -105,7 +105,7 @@ class GetLangauges(unittest.TestCase):
             mock_iterable_list.append(mock_iterable)
         mock_repo.iter_commits.return_value = mock_iterable_list
 
-        age, cr = get_languages_from_repo.get_repo_metadata('tech-radar')
+        age, cr = get_languages_from_repo.get_repo_metadata('tech-radar', 'main')
 
         self.assertEqual(cr, 0.3)
         self.assertEqual(age, 1.0)
@@ -198,7 +198,7 @@ class GetLangauges(unittest.TestCase):
                 'packages': [{
                     'name': 'not_a_pkg',
                     'type': 'not_pkg',
-                    'version': 0.0,
+                    'version': None,
                     'bom-ref': None,
                     }]
         }
@@ -207,6 +207,34 @@ class GetLangauges(unittest.TestCase):
                 'type': 'not_pkg',
                 'name': 'not_a_pkg',
                 'version': 0.0,
+        }]
+        sbom_data = get_languages_from_repo.compressor(
+                repo='tech-radar',
+                age=10.1,
+                commit_rate=3.0,
+                languages={'python': 1000},
+                packages=syft_output,
+        )
+
+        self.assertDictEqual(sbom_data, expected_output)
+
+    def test_compressor_without_version(self):
+        expected_output = {
+                'repo': 'tech-radar',
+                'metadata': {'age': 10.1, 'commit_rate': 3.0},
+                'languages': {'python': 1000},
+                'packages': [{
+                    'name': 'not_a_pkg',
+                    'type': 'not_pkg',
+                    'version': None,
+                    'bom-ref': None,
+                    }]
+        }
+
+        syft_output = [{
+                'type': 'not_pkg',
+                'name': 'not_a_pkg',
+                'bom-ref': 0.0,
         }]
         sbom_data = get_languages_from_repo.compressor(
                 repo='tech-radar',
