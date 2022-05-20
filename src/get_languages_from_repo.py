@@ -259,8 +259,8 @@ def load_to_s3(repo: str, json_data: dict, bucket: str, role: str, ext_id: str) 
 def load_local(repo: str, json_data: dict) -> None:
     json_obj = json.dumps(json_data).encode('UTF-8')
     json_hash = hash(json_obj)
-    log.debug(f'Saving local file (/tmp/{date}-{repo}-{json_hash}.json)')
     date = datetime.datetime.now().strftime('%Y-%M-%d')
+    log.debug(f'Saving local file (/tmp/{date}-{repo}-{json_hash}.json)')
     with open(f"/tmp/{date}-{repo}-{json_hash}.json", "w+", encoding='utf-8') as f:
         json.dump(json_data, f, ensure_ascii=False, indent=4)
 
@@ -303,7 +303,7 @@ def process(repo: str, token: str, default_branch: str, role: str, verbose: bool
 @click.option('--verbose', default=False, help='The default_branch')
 def click_callback(repo: str = '', token: str = '', default_branch: str = 'main', verbose: bool = True):
     process(
-            repo=repo,
+            repo=repo
             token=TOKEN,
             default_branch=default_branch,
             verbose=verbose
