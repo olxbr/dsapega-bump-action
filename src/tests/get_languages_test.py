@@ -1,7 +1,6 @@
 import datetime
 import unittest
 import boto3
-import botocore
 from git import GitCommandError
 
 from unittest.mock import patch
@@ -24,8 +23,7 @@ class GetLangauges(unittest.TestCase):
         self.assertEqual(repos, {"kotlin": "5000", "python": "4000"})
 
     @patch(
-            'gh_api_requester.GHAPIRequests.get',
-            side_effect=test_utils.mocked_requests_get
+        "gh_api_requester.GHAPIRequests.get", side_effect=test_utils.mocked_requests_get
     )
     @patch("time.sleep", return_value=None)
     def test_get_repo_return_0_languages(self, mock_get, mock_time):
@@ -34,8 +32,7 @@ class GetLangauges(unittest.TestCase):
         self.assertEqual(repos, {})
 
     @patch(
-            'gh_api_requester.GHAPIRequests.get',
-            side_effect=test_utils.mocked_requests_get
+        "gh_api_requester.GHAPIRequests.get", side_effect=test_utils.mocked_requests_get
     )
     @patch("time.sleep", return_value=None)
     def test_get_repo_creation_date(self, mock_get, mock_time):
@@ -43,12 +40,14 @@ class GetLangauges(unittest.TestCase):
 
         self.assertEqual(creation_date, "2022-04-08T17:46:53Z")
 
-    @patch('get_languages_from_repo.repo')
+    @patch("get_languages_from_repo.repo")
     @freeze_time("2022-05-04")
     def test_get_repo_age_metadata_commit_based(self, mock_repo):
         mock_iterable = mock.Mock()
         mock_repo.iter_commits.return_value = [mock_iterable]
-        mock_iterable.committed_datetime = datetime.datetime.strptime('2022-04-04 +0000', '%Y-%m-%d %z')
+        mock_iterable.committed_datetime = datetime.datetime.strptime(
+            "2022-04-04 +0000", "%Y-%m-%d %z"
+        )
 
         age, _, _ = get_languages_from_repo.get_repo_age_metadata_commit_based()
 
@@ -95,9 +94,11 @@ class GetLangauges(unittest.TestCase):
     @patch("get_languages_from_repo.repo")
     @freeze_time("2022-05-04")
     def test_get_repo_age_commit_basd_clean_tree(self, mock_repo):
-        mock_repo.iter_commits.side_effect = GitCommandError('git rev-list master --', 128)
+        mock_repo.iter_commits.side_effect = GitCommandError(
+            "git rev-list master --", 128
+        )
 
-        age = get_languages_from_repo.get_repo_age_commit_based()
+        age, _, _ = get_languages_from_repo.get_repo_age_metadata_commit_based()
 
         self.assertEqual(age, 0.0)
 
@@ -120,9 +121,11 @@ class GetLangauges(unittest.TestCase):
     @freeze_time("2022-05-04")
     def test_get_repo_commit_rate(self, mock_repo):
         mock_iterable_list = []
-        for i in range(1,10):
+        for i in range(1, 10):
             mock_iterable = mock.Mock()
-            mock_iterable.committed_datetime = datetime.datetime.strptime(f'2022-04-0{i} +0000', '%Y-%m-%d %z')
+            mock_iterable.committed_datetime = datetime.datetime.strptime(
+                f"2022-04-0{i} +0000", "%Y-%m-%d %z"
+            )
             mock_iterable_list.append(mock_iterable)
         mock_repo.iter_commits.return_value = mock_iterable_list
 
@@ -130,81 +133,99 @@ class GetLangauges(unittest.TestCase):
 
         self.assertEqual(cr, 0.3)
 
-    @patch('get_languages_from_repo.repo')
+    @patch("get_languages_from_repo.repo")
     @freeze_time("2022-05-04")
-    def test_get_repo_age_commit_basd_with_clean_tree(self, mock_repo):
-        mock_repo.iter_commits.side_effect = GitCommandError('git rev-list master --', 128)
+    def test_get_repo_cr_commit_basd_with_clean_tree(self, mock_repo):
+        mock_repo.iter_commits.side_effect = GitCommandError(
+            "git rev-list master --", 128
+        )
 
         cr = get_languages_from_repo.get_repo_commit_rate()
 
         self.assertEqual(cr, 0.0)
 
-    @patch('get_languages_from_repo.repo')
+    @patch(
+        "gh_api_requester.GHAPIRequests.get", side_effect=test_utils.mocked_requests_get
+    )
+    @patch("get_languages_from_repo.repo")
     @freeze_time("2022-05-04")
-    def test_get_repo_metadata_with_clean_tree(self, mock_repo):
-        mock_repo.iter_commits.side_effect = GitCommandError('git rev-list main --', 128)
+    def test_get_repo_metadata_with_clean_tree(self, mock_repo, mock_get):
+        mock_repo.iter_commits.side_effect = GitCommandError(
+            "git rev-list main --", 128
+        )
 
-        age, cr = get_languages_from_repo.get_repo_metadata('tech-radar', 'main')
+        age, cr, created_at = get_languages_from_repo.get_repo_metadata(
+            "tech-radar", "main"
+        )
 
         self.assertEqual(cr, 0.0)
         self.assertEqual(age, 0.0)
+        self.assertEqual(created_at, "2022-04-08T17:46:53Z")
 
-    @patch('get_languages_from_repo.repo')
+    @patch(
+        "gh_api_requester.GHAPIRequests.get", side_effect=test_utils.mocked_requests_get
+    )
+    @patch("get_languages_from_repo.repo")
     @freeze_time("2022-05-01")
-    def test_get_repo_metadata(self, mock_repo):
+    def test_get_repo_metadata(self, mock_repo, mock_get):
         mock_iterable_list = []
         for i in range(9, 0, -1):
             mock_iterable = mock.Mock()
-            mock_iterable.committed_datetime = datetime.datetime.strptime(f'2022-04-0{i} +0000', '%Y-%m-%d %z')
+            mock_iterable.committed_datetime = datetime.datetime.strptime(
+                f"2022-04-0{i} +0000", "%Y-%m-%d %z"
+            )
             mock_iterable_list.append(mock_iterable)
         mock_repo.iter_commits.return_value = mock_iterable_list
 
-        age, cr = get_languages_from_repo.get_repo_metadata('tech-radar', 'main')
+        age, cr, created_at = get_languages_from_repo.get_repo_metadata(
+            "tech-radar", "main"
+        )
 
         self.assertEqual(cr, 0.3)
         self.assertEqual(age, 1.0)
+        self.assertEqual(created_at, "2022-04-08T17:46:53Z")
 
     @mock_s3
     @mock_sts
     def test_load_to_s3_with_assume_role_throws_exception_if_bucket_doesnt_exist(self):
-        repo = 'tech-radar'
+        repo = "tech-radar"
         json_data = '{"foo": "bar"}'
-        bucket = 'blackbox'
-        role = 'arn:aws:iam::000000000000:role/blackbox'
-        ext_id = '00000000-0000-0000-0000-000000000000'
+        bucket = "blackbox"
+        role = "arn:aws:iam::000000000000:role/blackbox"
+        ext_id = "00000000-0000-0000-0000-000000000000"
 
         with self.assertRaises(Exception) as context:
             get_languages_from_repo.load_to_s3(repo, json_data, bucket, role, ext_id)
 
-        self.assertTrue('NoSuchBucket' in str(context.exception))
+        self.assertTrue("NoSuchBucket" in str(context.exception))
 
     @mock_s3
     @mock_sts
     def test_load_to_s3_with_assume_role_throws_exception_if_role_is_invalid(self):
-        repo = 'tech-radar'
+        repo = "tech-radar"
         json_data = '{"foo": "bar"}'
-        bucket = 'blackbox'
-        role = ''
-        ext_id = ''
+        bucket = "blackbox"
+        role = ""
+        ext_id = ""
 
-        conn = boto3.resource('s3', region_name='us-east-1')
-        conn.create_bucket(Bucket='blackbox')
+        conn = boto3.resource("s3", region_name="us-east-1")
+        conn.create_bucket(Bucket="blackbox")
 
         with self.assertRaises(Exception) as context:
             get_languages_from_repo.load_to_s3(repo, json_data, bucket, role, ext_id)
 
-        self.assertTrue('Parameter validation failed' in str(context.exception))
+        self.assertTrue("Parameter validation failed" in str(context.exception))
 
     @mock_s3
     @mock_sts
     def test_load_to_s3_pushes_to_s3(self):
-        repo = 'tech-radar'
+        repo = "tech-radar"
         json_data = '{"foo": "bar"}'
-        bucket = 'blackbox'
-        role = 'arn:aws:iam::000000000000:role/blackbox'
-        ext_id = '00000000-0000-0000-0000-000000000000'
+        bucket = "blackbox"
+        role = "arn:aws:iam::000000000000:role/blackbox"
+        ext_id = "00000000-0000-0000-0000-000000000000"
 
-        conn = boto3.resource('s3', region_name='us-east-1')
+        conn = boto3.resource("s3", region_name="us-east-1")
         conn.create_bucket(Bucket=bucket)
         s3_bucket = conn.Bucket(bucket)
 
@@ -212,114 +233,154 @@ class GetLangauges(unittest.TestCase):
 
         for obj in s3_bucket.objects.all():
             key = obj.key
-            # YYYY-MM-DD-<REPO_NAME>-<HASH>.json
-            self.assertRegex(key, r'\d{4}-\d{2}-\d{2}-[-\w]+-\d{19}.json$')
+            self.assertRegex(key, r'\d{4}-\d{2}-\d{2}-[-\w]+-\d{19}.json$')  # fmt: skip
 
     def test_compressor(self):
         expected_output = {
-                'repo': 'tech-radar',
-                'metadata': {'age': 10.1, 'commit_rate': 3.0},
-                'languages': {'python': 1000},
-                'packages': [{
-                    'name': 'not_a_pkg',
-                    'type': 'not_pkg',
-                    'version': 0.0,
-                    'bom-ref': 'none-ref',
-                    }]
+            "repo": "tech-radar",
+            "metadata": {
+                "age": 10.1,
+                "commit_rate": 3.0,
+                "created_at": "2022-04-08T17:46:53Z",
+                "first_commit_date": "2022-04-08T17:46:53Z",
+                "last_commit_date": "2022-05-26T14:06:54Z",
+            },
+            "languages": {"python": 1000},
+            "packages": [
+                {
+                    "name": "not_a_pkg",
+                    "type": "not_pkg",
+                    "version": 0.0,
+                    "bom-ref": "none-ref",
+                }
+            ],
         }
 
-        syft_output = [{
-                'type': 'not_pkg',
-                'name': 'not_a_pkg',
-                'version': 0.0,
-                'bom-ref': 'none-ref',
-        }]
+        syft_output = [
+            {
+                "type": "not_pkg",
+                "name": "not_a_pkg",
+                "version": 0.0,
+                "bom-ref": "none-ref",
+            }
+        ]
         sbom_data = get_languages_from_repo.compressor(
-                repo='tech-radar',
-                age=10.1,
-                commit_rate=3.0,
-                languages={'python': 1000},
-                packages=syft_output,
+            repo="tech-radar",
+            age=10.1,
+            commit_rate=3.0,
+            languages={"python": 1000},
+            packages=syft_output,
+            created_at="2022-04-08T17:46:53Z",
+            first_commit_date="2022-04-08T17:46:53Z",
+            last_commit_date="2022-05-26T14:06:54Z",
         )
 
         self.assertDictEqual(sbom_data, expected_output)
 
     def test_compressor_without_bom_ref(self):
         expected_output = {
-                'repo': 'tech-radar',
-                'metadata': {'age': 10.1, 'commit_rate': 3.0},
-                'languages': {'python': 1000},
-                'packages': [{
-                    'name': 'not_a_pkg',
-                    'type': 'not_pkg',
-                    'version': None,
-                    'bom-ref': None,
-                    }]
+            "repo": "tech-radar",
+            "metadata": {
+                "age": 10.1,
+                "commit_rate": 3.0,
+                "created_at": "2022-04-08T17:46:53Z",
+                "first_commit_date": "2022-04-08T17:46:53Z",
+                "last_commit_date": "2022-05-26T14:06:54Z",
+            },
+            "languages": {"python": 1000},
+            "packages": [
+                {
+                    "name": "not_a_pkg",
+                    "type": "not_pkg",
+                    "version": None,
+                    "bom-ref": None,
+                }
+            ],
         }
 
-        syft_output = [{
-                'type': 'not_pkg',
-                'name': 'not_a_pkg',
-                'version': 0.0,
-        }]
+        syft_output = [
+            {
+                "type": "not_pkg",
+                "name": "not_a_pkg",
+                "version": 0.0,
+            }
+        ]
         sbom_data = get_languages_from_repo.compressor(
-                repo='tech-radar',
-                age=10.1,
-                commit_rate=3.0,
-                languages={'python': 1000},
-                packages=syft_output,
+            repo="tech-radar",
+            age=10.1,
+            commit_rate=3.0,
+            languages={"python": 1000},
+            packages=syft_output,
+            last_commit_date="2022-05-26T14:06:54Z",
+            first_commit_date="2022-04-08T17:46:53Z",
+            created_at="2022-04-08T17:46:53Z",
         )
 
         self.assertDictEqual(sbom_data, expected_output)
 
     def test_compressor_without_version(self):
         expected_output = {
-                'repo': 'tech-radar',
-                'metadata': {'age': 10.1, 'commit_rate': 3.0},
-                'languages': {'python': 1000},
-                'packages': [{
-                    'name': 'not_a_pkg',
-                    'type': 'not_pkg',
-                    'version': None,
-                    'bom-ref': None,
-                    }]
+            "repo": "tech-radar",
+            "metadata": {
+                "age": 10.1,
+                "commit_rate": 3.0,
+                "created_at": "2022-04-08T17:46:53Z",
+                "first_commit_date": "2022-04-08T17:46:53Z",
+                "last_commit_date": "2022-05-26T14:06:54Z",
+            },
+            "languages": {"python": 1000},
+            "packages": [
+                {
+                    "name": "not_a_pkg",
+                    "type": "not_pkg",
+                    "version": None,
+                    "bom-ref": None,
+                }
+            ],
         }
 
-        syft_output = [{
-                'type': 'not_pkg',
-                'name': 'not_a_pkg',
-                'bom-ref': 0.0,
-        }]
+        syft_output = [
+            {
+                "type": "not_pkg",
+                "name": "not_a_pkg",
+                "bom-ref": 0.0,
+            }
+        ]
         sbom_data = get_languages_from_repo.compressor(
-                repo='tech-radar',
-                age=10.1,
-                commit_rate=3.0,
-                languages={'python': 1000},
-                packages=syft_output,
+            repo="tech-radar",
+            age=10.1,
+            commit_rate=3.0,
+            languages={"python": 1000},
+            packages=syft_output,
+            created_at="2022-04-08T17:46:53Z",
+            first_commit_date="2022-04-08T17:46:53Z",
+            last_commit_date="2022-05-26T14:06:54Z",
         )
 
         self.assertDictEqual(sbom_data, expected_output)
 
     def test_get_files_by_regex_recursive_no_parameters_passed(self):
         lis_of_files_as_should_be = [
-                'dev.yml',
-                'Makefile',
-                'src/code.py',
-                'src/tests.py',
-                'src/config/config.yml',
+            "dev.yml",
+            "Makefile",
+            "src/code.py",
+            "src/tests.py",
+            "src/config/config.yml",
         ]
-        with patch('os.listdir') as mocked_listdir:
-            with patch('os.path.isdir') as mocked_isdir:
+        with patch("os.listdir") as mocked_listdir:
+            with patch("os.path.isdir") as mocked_isdir:
+                # fmt: off
                 mocked_listdir.side_effect = [
-                        ['dev.yml', 'Makefile', 'src'],
-                        ['code.py', 'tests.py', 'config'],
-                        ['config.yml']
+                    ["dev.yml", "Makefile", "src"],
+                    ["code.py", "tests.py", "config"],
+                    ["config.yml"],
                 ]
                 mocked_isdir.side_effect = [
-                        False, False, True,
-                        False, False, True,
-                        False
+                    False, False, True,
+                    False, False, True,
+                    False,
                 ]
+                # fmt: on
 
                 list_of_files = get_languages_from_repo.get_files_by_regex()
 
@@ -327,22 +388,26 @@ class GetLangauges(unittest.TestCase):
 
     def test_get_files_by_regex_recursive(self):
         lis_of_files_as_should_be = [
-                'Dockerfile',
-                'src/config/Dockerfile.test',
+            "Dockerfile",
+            "src/config/Dockerfile.test",
         ]
-        with patch('os.listdir') as mocked_listdir:
-            with patch('os.path.isdir') as mocked_isdir:
+        with patch("os.listdir") as mocked_listdir:
+            with patch("os.path.isdir") as mocked_isdir:
+                # fmt: off
                 mocked_listdir.side_effect = [
-                        ['dev.yml', 'Dockerfile', 'src'],
-                        ['code.py', 'tests.py', 'config'],
-                        ['config.yml', 'Dockerfile.test']
+                    ["dev.yml", "Dockerfile", "src"],
+                    ["code.py", "tests.py", "config"],
+                    ["config.yml", "Dockerfile.test"],
                 ]
                 mocked_isdir.side_effect = [
-                        False, False, True,
-                        False, False, True,
-                        False, False
+                    False, False, True,
+                    False, False, True,
+                    False, False,
                 ]
+                # fmt: on
 
-                list_of_files = get_languages_from_repo.get_files_by_regex('.*Dockerfile*')
+                list_of_files = get_languages_from_repo.get_files_by_regex(
+                    ".*Dockerfile*"
+                )
 
         self.assertEqual(lis_of_files_as_should_be, list_of_files)
