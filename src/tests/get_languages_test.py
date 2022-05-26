@@ -15,45 +15,84 @@ import utils as test_utils
 
 
 class GetLangauges(unittest.TestCase):
+    @patch(
+        "gh_api_requester.GHAPIRequests.get", side_effect=test_utils.mocked_requests_get
+    )
+    @patch("time.sleep", return_value=None)
+    def test_get_repo_languages(self, mock_get, mock_time):
+        repos = get_languages_from_repo.get_repo_languages(repo="tech-radar")
+        self.assertEqual(repos, {"kotlin": "5000", "python": "4000"})
 
     @patch(
             'gh_api_requester.GHAPIRequests.get',
             side_effect=test_utils.mocked_requests_get
     )
-    def test_get_repo_languages(self, mock_get):
-        repos = get_languages_from_repo.get_repo_languages(repo='tech-radar')
-        self.assertEqual(
-                repos,
-                {
-                    "kotlin": '5000',
-                    "python": '4000'
-                }
-        )
+    @patch("time.sleep", return_value=None)
+    def test_get_repo_return_0_languages(self, mock_get, mock_time):
+        repos = get_languages_from_repo.get_repo_languages(repo="zero-lang-repo")
+
+        self.assertEqual(repos, {})
 
     @patch(
             'gh_api_requester.GHAPIRequests.get',
             side_effect=test_utils.mocked_requests_get
     )
-    def test_get_repo_return_0_languages(self, mock_get):
-        repos = get_languages_from_repo.get_repo_languages(repo='zero-lang-repo')
+    @patch("time.sleep", return_value=None)
+    def test_get_repo_creation_date(self, mock_get, mock_time):
+        creation_date = get_languages_from_repo.get_creation_date(repo="tech-radar")
 
-        self.assertEqual(
-                repos,
-                {}
-        )
+        self.assertEqual(creation_date, "2022-04-08T17:46:53Z")
 
     @patch('get_languages_from_repo.repo')
     @freeze_time("2022-05-04")
-    def test_get_repo_age_commit_based(self, mock_repo):
+    def test_get_repo_age_metadata_commit_based(self, mock_repo):
         mock_iterable = mock.Mock()
         mock_repo.iter_commits.return_value = [mock_iterable]
         mock_iterable.committed_datetime = datetime.datetime.strptime('2022-04-04 +0000', '%Y-%m-%d %z')
 
-        age = get_languages_from_repo.get_repo_age_commit_based()
+        age, _, _ = get_languages_from_repo.get_repo_age_metadata_commit_based()
 
         self.assertEqual(age, 1.0)
 
-    @patch('get_languages_from_repo.repo')
+    @patch("get_languages_from_repo.repo")
+    @freeze_time("2022-05-04")
+    def test_get_repo_first_commit_date(self, mock_repo):
+        mock_iterable = mock.Mock()
+        mock_repo.iter_commits.return_value = [mock_iterable]
+        mock_iterable.committed_datetime = datetime.datetime.strptime(
+            "2022-04-04 +0000", "%Y-%m-%d %z"
+        )
+
+        (
+            _,
+            first_commit_date,
+            _,
+        ) = get_languages_from_repo.get_repo_age_metadata_commit_based()
+
+        self.assertEqual(first_commit_date, "2022-04-04 +0000")
+
+    @patch("get_languages_from_repo.repo")
+    @freeze_time("2022-05-04")
+    def test_get_repo_last_commit_date(self, mock_repo):
+        mock_iterable_last = mock.Mock()
+        mock_iterable_first = mock.Mock()
+        mock_repo.iter_commits.return_value = [mock_iterable_first, mock_iterable_last]
+        mock_iterable_first.committed_datetime = datetime.datetime.strptime(
+            "2021-04-04 +0000", "%Y-%m-%d %z"
+        )
+        mock_iterable_last.committed_datetime = datetime.datetime.strptime(
+            "2022-04-04 +0000", "%Y-%m-%d %z"
+        )
+
+        (
+            _,
+            _,
+            last_commit_date,
+        ) = get_languages_from_repo.get_repo_age_metadata_commit_based()
+
+        self.assertEqual(last_commit_date, "2022-04-04 +0000")
+
+    @patch("get_languages_from_repo.repo")
     @freeze_time("2022-05-04")
     def test_get_repo_age_commit_basd_clean_tree(self, mock_repo):
         mock_repo.iter_commits.side_effect = GitCommandError('git rev-list master --', 128)
@@ -62,7 +101,22 @@ class GetLangauges(unittest.TestCase):
 
         self.assertEqual(age, 0.0)
 
-    @patch('get_languages_from_repo.repo')
+    @patch("get_languages_from_repo.repo")
+    @freeze_time("2022-05-04")
+    def test_get_repo_first_commit_date_basd_clean_tree(self, mock_repo):
+        mock_repo.iter_commits.side_effect = GitCommandError(
+            "git rev-list master --", 128
+        )
+
+        (
+            _,
+            first_commit_date,
+            _,
+        ) = get_languages_from_repo.get_repo_age_metadata_commit_based()
+
+        self.assertEqual(first_commit_date, None)
+
+    @patch("get_languages_from_repo.repo")
     @freeze_time("2022-05-04")
     def test_get_repo_commit_rate(self, mock_repo):
         mock_iterable_list = []

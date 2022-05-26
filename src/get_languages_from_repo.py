@@ -41,11 +41,27 @@ def get_repo_languages(repo: str) -> dict:
     return data
 
 
-def get_repo_age_commit_based(default_branch: str = 'main') -> float:
-    log.debug(f'Getting age commit based... branch: {default_branch}')
+def get_creation_date(repo: str) -> str:
+    log.debug(f"Getting {repo} creation date")
+    response = requester.get(
+        BASE_URL + f"/repos/olxbr/{repo}",
+        headers={
+            "Authorization": f"token {TOKEN}",
+            "Accept": "application/vnd.github.v3+json",
+        },
+    )
+    data = response.json()
+    return data["created_at"]
+
+
+def get_repo_age_metadata_commit_based(default_branch: str = "main") -> float:
+    log.debug(f"Getting age commit based... branch: {default_branch}")
     try:
         commits = list(repo.iter_commits(default_branch, all=True))
+        first_commit_datetime = commits[-1].committed_datetime
         last_commit_datetime = commits[-1].committed_datetime
+        first_commit_str = first_commit_datetime.strftime("%Y-%m-%d %z")
+        last_commit_str = last_commit_datetime.strftime("%Y-%m-%d %z")
     except GitCommandError:
         log.warning(f'Failed to get age! Using default 0.0 (branch: {default_branch})')
         return 0.0
@@ -53,7 +69,7 @@ def get_repo_age_commit_based(default_branch: str = 'main') -> float:
             (datetime.datetime.now(datetime.timezone.utc) - last_commit_datetime).days/30,
             2
     )
-    return age_in_months
+    return age_in_months, first_commit_str, last_commit_str
 
 
 def get_repo_commit_rate(default_branch: str = 'main') -> float:
@@ -76,10 +92,15 @@ def get_repo_commit_rate(default_branch: str = 'main') -> float:
 
 
 def get_repo_metadata(repo: str, default_branch: str) -> str:
-    log.info(f'Getting Repository Metadata: {repo}:{default_branch}')
-    age_in_months = get_repo_age_commit_based(default_branch)
+    log.info(f"Getting Repository Metadata: {repo}:{default_branch}")
+    (
+        age_in_months,
+        first_commit_date,
+        last_commit_date,
+    ) = get_repo_age_metadata_commit_based(default_branch)
+    creation_date = get_creation_date(repo)
     commit_rate = get_repo_commit_rate(default_branch)
-    return age_in_months, commit_rate
+    return age_in_months, commit_rate, creation_date
 
 
 def get_files_by_regex(regex: str = r"(.*?)", dir_to_check: str = "."):
@@ -188,39 +209,48 @@ def get_syft_sbom(path: str = '.', **kwargs) -> dict:
     return process_output['components']
 
 
-def compressor(repo: str = '', **kwargs) -> dict:
-    log.info('Compressing data in a json objetc')
-    age = kwargs.get('age', 0)
-    cr = kwargs.get('commit_rate', 0)
-    languages = kwargs.get('languages', {})
+def compressor(repo: str = "", **kwargs) -> dict:
+    log.info("Compressing data in a json objetc")
+    age = kwargs.get("age", 0)
+    cr = kwargs.get("commit_rate", 0)
+    languages = kwargs.get("languages", {})
+    created_at = kwargs.get("created_at", None)
+    frist_commit_date = kwargs.get("first_commit_date", None)
+    last_commit_date = kwargs.get("last_commit_date", None)
     packages = kwargs.get(
             'packages',
             [{'type': None, 'name': 'not_a_pkg', 'version': None, 'bom-ref': None}]
     )
 
     structure = {
-        'repo': repo,
-        'metadata': {'age': age, 'commit_rate': cr},
-        'languages': languages,
-        'packages': []
+        "repo": repo,
+        "metadata": {
+            "age": age,
+            "commit_rate": cr,
+            "created_at": created_at,
+            "first_commit_date": frist_commit_date,
+            "last_commit_date": last_commit_date,
+        },
+        "languages": languages,
+        "packages": [],
     }
 
     for pkg in packages:
         try:
             log.debug(f"Found {pkg['name']}:{pkg['type']}")
             pkg_structure = {
-                    'name': pkg['name'],
-                    'type': pkg['type'],
-                    'version': pkg['version'],
-                    'bom-ref': pkg['bom-ref'],
+                "name": pkg["name"],
+                "type": pkg["type"],
+                "version": pkg["version"],
+                "bom-ref": pkg["bom-ref"],
             }
         except KeyError:
             log.warning(f"The pkg {pkg['name']}:{pkg['type']} does not have a version or bom-ref")
             pkg_structure = {
-                    'name': pkg['name'],
-                    'type': pkg['type'],
-                    'version': None,
-                    'bom-ref': None,
+                "name": pkg["name"],
+                "type": pkg["type"],
+                "version": None,
+                "bom-ref": None,
             }
         structure['packages'].append(pkg_structure)
     return structure
@@ -282,11 +312,12 @@ def process(repo: str, token: str, default_branch: str, role: str, verbose: bool
     languages = get_repo_languages(repo)
     log.info(f"This languages where found in the repo: {languages}")
     sbom_data = compressor(
-            repo=repo,
-            age=age,
-            commit_rate=cr,
-            languages=languages,
-            packages=syft_output,
+        repo=repo,
+        age=age,
+        commit_rate=cr,
+        languages=languages,
+        packages=syft_output,
+        created_at=created_at,
     )
     log.info("Sbom acquire process finished! Sending...")
     ext_id = kwargs.get('external_id', '')

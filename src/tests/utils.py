@@ -20,6 +20,8 @@ def mocked_requests_get(*args, **kwargs):
             }, 200)
         if args[0] == BASE_URL.format('/repos/olxbr/zero-lang-repo/languages'):
             return MockResponse({}, 200)
+        if args[0] == BASE_URL.format("/repos/olxbr/tech-radar"):
+            return MockResponse({"created_at": "2022-04-08T17:46:53Z"}, 200)
     else:
         return MockResponse({
             "message": "Bad credentials",
