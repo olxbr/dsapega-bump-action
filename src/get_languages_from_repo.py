@@ -303,10 +303,10 @@ def process(repo: str, token: str, default_branch: str, role: str, verbose: bool
 @click.option('--verbose', default=False, help='The default_branch')
 def click_callback(repo: str = '', token: str = '', default_branch: str = 'main', verbose: bool = True):
     process(
-            repo=repo
+            repo=repo,
             token=TOKEN,
             default_branch=default_branch,
-            verbose=verbose
+            verbose=verbose,
     )
 
 
