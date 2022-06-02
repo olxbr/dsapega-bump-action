@@ -6,7 +6,7 @@ import tqdm
 from requests.exceptions import ConnectionError, ConnectTimeout
 
 
-class GHAPIRequests():
+class GHAPIRequests:
     def __init__(self, **kwargs):
         self.DEFAULT_SLEEP = kwargs.get("DEFAULT_SLEEP", 0.2)
         self.log = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ class GHAPIRequests():
             try:
                 self.log.debug("Get and sleep")
                 result = requests.get(url, params=params, headers=headers)
-                self.rate_limit = int(result.headers['X-RateLimit-Used'])
+                self.rate_limit = int(result.headers["X-RateLimit-Used"])
                 self.pbar.set_description(f"Rate Limit {self.DEFAULT_SLEEP}")
                 self.pbar.n = self.rate_limit
                 self.pbar.update()
@@ -42,10 +42,14 @@ class GHAPIRequests():
                 time.sleep(self.DEFAULT_SLEEP)
             except (ConnectionError, ConnectTimeout):
                 attempt += 1
-                sleeptime = self.sleepbase ** attempt
-                self.log.warning(f"The previous attempt fail. Attempt {attempt}/{self.MAXIMUM_ATTEMPTS} will begin in {sleeptime}s")
+                sleeptime = self.sleepbase**attempt
+                self.log.warning(
+                    f"The previous attempt fail. Attempt {attempt}/{self.MAXIMUM_ATTEMPTS} will begin in {sleeptime}s"
+                )
                 time.sleep(sleeptime)
-                self.log.debug(f"Got ConnectionError. Sleeping for {self.sleepbase}s and retrying")
+                self.log.debug(
+                    f"Got ConnectionError. Sleeping for {self.sleepbase}s and retrying"
+                )
                 time.sleep(sleeptime)
                 continue
             if result.status_code != 200:
@@ -53,9 +57,11 @@ class GHAPIRequests():
                     return result
                 attempt += 1
                 self.log.warning(f"{result.url} returned {result.status_code}")
-                sleeptime = self.sleepbase ** attempt
+                sleeptime = self.sleepbase**attempt
                 time.sleep(sleeptime)
-                self.log.debug(f"Got Ratelimit. Sleeping for {self.sleepbase}s and retrying")
+                self.log.debug(
+                    f"Got Ratelimit. Sleeping for {self.sleepbase}s and retrying"
+                )
                 time.sleep(sleeptime)
             else:
                 return result
