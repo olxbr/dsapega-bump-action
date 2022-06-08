@@ -1,5 +1,5 @@
 import argparse
-import get_languages_from_repo
+import get_data_from_repo
 import json
 import logging
 import os
@@ -38,7 +38,7 @@ def main():
     log.info("DOCKER TOKEN STATUS: acquired")
 
     log.info("The SBOM process will begin")
-    get_languages_from_repo.process(
+    get_data_from_repo.process(
         repo=repo,
         token=configs["token"],
         default_branch=default_branch,

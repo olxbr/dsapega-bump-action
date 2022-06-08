@@ -8,18 +8,18 @@ from unittest import mock
 from freezegun import freeze_time
 from moto import mock_s3, mock_sts
 
-import get_languages_from_repo
+import get_data_from_repo
 
 import utils as test_utils
 
 
-class GetLangauges(unittest.TestCase):
+class GetData(unittest.TestCase):
     @patch(
         "gh_api_requester.GHAPIRequests.get", side_effect=test_utils.mocked_requests_get
     )
     @patch("time.sleep", return_value=None)
     def test_get_repo_languages(self, mock_get, mock_time):
-        repos = get_languages_from_repo.get_repo_languages(repo="tech-radar")
+        repos = get_data_from_repo.get_repo_languages(repo="tech-radar")
         self.assertEqual(repos, {"kotlin": "5000", "python": "4000"})
 
     @patch(
@@ -27,7 +27,7 @@ class GetLangauges(unittest.TestCase):
     )
     @patch("time.sleep", return_value=None)
     def test_get_repo_return_0_languages(self, mock_get, mock_time):
-        repos = get_languages_from_repo.get_repo_languages(repo="zero-lang-repo")
+        repos = get_data_from_repo.get_repo_languages(repo="zero-lang-repo")
 
         self.assertEqual(repos, {})
 
@@ -36,11 +36,11 @@ class GetLangauges(unittest.TestCase):
     )
     @patch("time.sleep", return_value=None)
     def test_get_repo_creation_date(self, mock_get, mock_time):
-        creation_date = get_languages_from_repo.get_creation_date(repo="tech-radar")
+        creation_date = get_data_from_repo.get_creation_date(repo="tech-radar")
 
         self.assertEqual(creation_date, "2022-04-08T17:46:53Z")
 
-    @patch("get_languages_from_repo.repo")
+    @patch("get_data_from_repo.repo")
     @freeze_time("2022-05-04")
     def test_get_repo_age_metadata_commit_based(self, mock_repo):
         mock_iterable = mock.Mock()
@@ -49,11 +49,11 @@ class GetLangauges(unittest.TestCase):
             "2022-04-04 +0000", "%Y-%m-%d %z"
         )
 
-        age, _, _ = get_languages_from_repo.get_repo_age_metadata_commit_based()
+        age, _, _ = get_data_from_repo.get_repo_age_metadata_commit_based()
 
         self.assertEqual(age, 1.0)
 
-    @patch("get_languages_from_repo.repo")
+    @patch("get_data_from_repo.repo")
     @freeze_time("2022-05-04")
     def test_get_repo_first_commit_date(self, mock_repo):
         mock_iterable = mock.Mock()
@@ -66,11 +66,11 @@ class GetLangauges(unittest.TestCase):
             _,
             first_commit_date,
             _,
-        ) = get_languages_from_repo.get_repo_age_metadata_commit_based()
+        ) = get_data_from_repo.get_repo_age_metadata_commit_based()
 
         self.assertEqual(first_commit_date, "2022-04-04 +0000")
 
-    @patch("get_languages_from_repo.repo")
+    @patch("get_data_from_repo.repo")
     @freeze_time("2022-05-04")
     def test_get_repo_last_commit_date(self, mock_repo):
         mock_iterable_last = mock.Mock()
@@ -87,22 +87,22 @@ class GetLangauges(unittest.TestCase):
             _,
             _,
             last_commit_date,
-        ) = get_languages_from_repo.get_repo_age_metadata_commit_based()
+        ) = get_data_from_repo.get_repo_age_metadata_commit_based()
 
         self.assertEqual(last_commit_date, "2022-04-04 +0000")
 
-    @patch("get_languages_from_repo.repo")
+    @patch("get_data_from_repo.repo")
     @freeze_time("2022-05-04")
     def test_get_repo_age_commit_basd_clean_tree(self, mock_repo):
         mock_repo.iter_commits.side_effect = GitCommandError(
             "git rev-list master --", 128
         )
 
-        age, _, _ = get_languages_from_repo.get_repo_age_metadata_commit_based()
+        age, _, _ = get_data_from_repo.get_repo_age_metadata_commit_based()
 
         self.assertEqual(age, 0.0)
 
-    @patch("get_languages_from_repo.repo")
+    @patch("get_data_from_repo.repo")
     @freeze_time("2022-05-04")
     def test_get_repo_first_commit_date_basd_clean_tree(self, mock_repo):
         mock_repo.iter_commits.side_effect = GitCommandError(
@@ -113,11 +113,11 @@ class GetLangauges(unittest.TestCase):
             _,
             first_commit_date,
             _,
-        ) = get_languages_from_repo.get_repo_age_metadata_commit_based()
+        ) = get_data_from_repo.get_repo_age_metadata_commit_based()
 
         self.assertEqual(first_commit_date, None)
 
-    @patch("get_languages_from_repo.repo")
+    @patch("get_data_from_repo.repo")
     @freeze_time("2022-05-04")
     def test_get_repo_commit_rate(self, mock_repo):
         mock_iterable_list = []
@@ -129,32 +129,32 @@ class GetLangauges(unittest.TestCase):
             mock_iterable_list.append(mock_iterable)
         mock_repo.iter_commits.return_value = mock_iterable_list
 
-        cr = get_languages_from_repo.get_repo_commit_rate()
+        cr = get_data_from_repo.get_repo_commit_rate()
 
         self.assertEqual(cr, 0.3)
 
-    @patch("get_languages_from_repo.repo")
+    @patch("get_data_from_repo.repo")
     @freeze_time("2022-05-04")
     def test_get_repo_cr_commit_basd_with_clean_tree(self, mock_repo):
         mock_repo.iter_commits.side_effect = GitCommandError(
             "git rev-list master --", 128
         )
 
-        cr = get_languages_from_repo.get_repo_commit_rate()
+        cr = get_data_from_repo.get_repo_commit_rate()
 
         self.assertEqual(cr, 0.0)
 
     @patch(
         "gh_api_requester.GHAPIRequests.get", side_effect=test_utils.mocked_requests_get
     )
-    @patch("get_languages_from_repo.repo")
+    @patch("get_data_from_repo.repo")
     @freeze_time("2022-05-04")
     def test_get_repo_metadata_with_clean_tree(self, mock_repo, mock_get):
         mock_repo.iter_commits.side_effect = GitCommandError(
             "git rev-list main --", 128
         )
 
-        age, cr, created_at = get_languages_from_repo.get_repo_metadata(
+        age, cr, created_at = get_data_from_repo.get_repo_metadata(
             "tech-radar", "main"
         )
 
@@ -165,7 +165,7 @@ class GetLangauges(unittest.TestCase):
     @patch(
         "gh_api_requester.GHAPIRequests.get", side_effect=test_utils.mocked_requests_get
     )
-    @patch("get_languages_from_repo.repo")
+    @patch("get_data_from_repo.repo")
     @freeze_time("2022-05-01")
     def test_get_repo_metadata(self, mock_repo, mock_get):
         mock_iterable_list = []
@@ -177,7 +177,7 @@ class GetLangauges(unittest.TestCase):
             mock_iterable_list.append(mock_iterable)
         mock_repo.iter_commits.return_value = mock_iterable_list
 
-        age, cr, created_at = get_languages_from_repo.get_repo_metadata(
+        age, cr, created_at = get_data_from_repo.get_repo_metadata(
             "tech-radar", "main"
         )
 
@@ -195,7 +195,7 @@ class GetLangauges(unittest.TestCase):
         ext_id = "00000000-0000-0000-0000-000000000000"
 
         with self.assertRaises(Exception) as context:
-            get_languages_from_repo.load_to_s3(repo, json_data, bucket, role, ext_id)
+            get_data_from_repo.load_to_s3(repo, json_data, bucket, role, ext_id)
 
         self.assertTrue("NoSuchBucket" in str(context.exception))
 
@@ -212,7 +212,7 @@ class GetLangauges(unittest.TestCase):
         conn.create_bucket(Bucket="blackbox")
 
         with self.assertRaises(Exception) as context:
-            get_languages_from_repo.load_to_s3(repo, json_data, bucket, role, ext_id)
+            get_data_from_repo.load_to_s3(repo, json_data, bucket, role, ext_id)
 
         self.assertTrue("Parameter validation failed" in str(context.exception))
 
@@ -229,7 +229,7 @@ class GetLangauges(unittest.TestCase):
         conn.create_bucket(Bucket=bucket)
         s3_bucket = conn.Bucket(bucket)
 
-        get_languages_from_repo.load_to_s3(repo, json_data, bucket, role, ext_id)
+        get_data_from_repo.load_to_s3(repo, json_data, bucket, role, ext_id)
 
         for obj in s3_bucket.objects.all():
             key = obj.key
@@ -264,7 +264,7 @@ class GetLangauges(unittest.TestCase):
                 "bom-ref": "none-ref",
             }
         ]
-        sbom_data = get_languages_from_repo.compressor(
+        sbom_data = get_data_from_repo.compressor(
             repo="tech-radar",
             age=10.1,
             commit_rate=3.0,
@@ -305,7 +305,7 @@ class GetLangauges(unittest.TestCase):
                 "version": 0.0,
             }
         ]
-        sbom_data = get_languages_from_repo.compressor(
+        sbom_data = get_data_from_repo.compressor(
             repo="tech-radar",
             age=10.1,
             commit_rate=3.0,
@@ -346,7 +346,7 @@ class GetLangauges(unittest.TestCase):
                 "bom-ref": 0.0,
             }
         ]
-        sbom_data = get_languages_from_repo.compressor(
+        sbom_data = get_data_from_repo.compressor(
             repo="tech-radar",
             age=10.1,
             commit_rate=3.0,
@@ -382,7 +382,7 @@ class GetLangauges(unittest.TestCase):
                 ]
                 # fmt: on
 
-                list_of_files = get_languages_from_repo.get_files_by_regex()
+                list_of_files = get_data_from_repo.get_files_by_regex()
 
         self.assertEqual(lis_of_files_as_should_be, list_of_files)
 
@@ -406,7 +406,7 @@ class GetLangauges(unittest.TestCase):
                 ]
                 # fmt: on
 
-                list_of_files = get_languages_from_repo.get_files_by_regex(
+                list_of_files = get_data_from_repo.get_files_by_regex(
                     ".*Dockerfile*"
                 )
 
