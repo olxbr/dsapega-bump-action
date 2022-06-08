@@ -72,14 +72,25 @@ def get_repo_age_metadata_commit_based(default_branch: str = "main") -> float:
     return age_in_months, first_commit_str, last_commit_str
 
 
-def get_repo_commit_rate(default_branch: str = "main") -> float:
-    log.debug(f"Getting commit rate... branch: {default_branch}")
+def get_commits_from_repo(default_branch: str = "main") -> list:
     try:
         commits = list(repo.iter_commits(default_branch))
     except GitCommandError:
-        log.warning(f"Failed to get CR! Using default 0.0 (branch: {default_branch})")
-        return 0.0
-    conter = 0
+        log.warning(f"Failed to get Commits! Using default [] (branch: {default_branch})")
+        return [], [{}]
+    commits_struct = [
+            {
+                'sha': c.hexsha,
+                'commied_at': c.committed_datetime.strftime("%Y-%m-%d %z"),
+                'author': c.author.name,
+                'commit_message': c.message,
+            } for c in commits]
+    return commits, commits_struct
+
+def get_repo_commit_rate(default_branch: str = "main") -> float:
+    log.debug(f"Getting commit rate... branch: {default_branch}")
+    commits, _ = get_commits_from_repo(default_branch)
+    conter = 0.0
     month_ago = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(
         days=INTERVAL
     )
@@ -97,9 +108,10 @@ def get_repo_metadata(repo: str, default_branch: str) -> str:
         first_commit_date,
         last_commit_date,
     ) = get_repo_age_metadata_commit_based(default_branch)
+    _, commits = get_commits_from_repo(default_branch)
     creation_date = get_creation_date(repo)
     commit_rate = get_repo_commit_rate(default_branch)
-    return age_in_months, commit_rate, creation_date
+    return age_in_months, commit_rate, creation_date, commits
 
 
 def get_files_by_regex(regex: str = r"(.*?)", dir_to_check: str = "."):
@@ -210,6 +222,7 @@ def compressor(repo: str = "", **kwargs) -> dict:
     created_at = kwargs.get("created_at", None)
     frist_commit_date = kwargs.get("first_commit_date", None)
     last_commit_date = kwargs.get("last_commit_date", None)
+    commits = kwargs.get("commits", [{}])
     packages = kwargs.get(
         "packages",
         [{"type": None, "name": "not_a_pkg", "version": None, "bom-ref": None}],
@@ -223,6 +236,7 @@ def compressor(repo: str = "", **kwargs) -> dict:
             "created_at": created_at,
             "first_commit_date": frist_commit_date,
             "last_commit_date": last_commit_date,
+            "commits": commits,
         },
         "languages": languages,
         "packages": [],
@@ -297,7 +311,12 @@ def process(
         logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
 
     TOKEN = token
-    age, cr, created_at = get_repo_metadata(repo, default_branch)
+    (
+        age,
+        cr,
+        created_at,
+        commits,
+    ) = get_repo_metadata(repo, default_branch)
     log.info(f"The AGE is: {age}, The CR is: {cr}")
     syft_output = get_syft_sbom(".", **kwargs)
     log.info(f"Found {len(syft_output)} metadatas with syft")
@@ -310,6 +329,7 @@ def process(
         languages=languages,
         packages=syft_output,
         created_at=created_at,
+        commits=commits,
     )
     log.info("Sbom acquire process finished! Sending...")
     ext_id = kwargs.get("external_id", "")
