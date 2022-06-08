@@ -154,13 +154,14 @@ class GetData(unittest.TestCase):
             "git rev-list main --", 128
         )
 
-        age, cr, created_at = get_data_from_repo.get_repo_metadata(
+        age, cr, created_at, commits = get_data_from_repo.get_repo_metadata(
             "tech-radar", "main"
         )
 
         self.assertEqual(cr, 0.0)
         self.assertEqual(age, 0.0)
         self.assertEqual(created_at, "2022-04-08T17:46:53Z")
+        self.assertEqual(commits, [{}])
 
     @patch(
         "gh_api_requester.GHAPIRequests.get", side_effect=test_utils.mocked_requests_get
@@ -177,13 +178,14 @@ class GetData(unittest.TestCase):
             mock_iterable_list.append(mock_iterable)
         mock_repo.iter_commits.return_value = mock_iterable_list
 
-        age, cr, created_at = get_data_from_repo.get_repo_metadata(
+        age, cr, created_at, commits = get_data_from_repo.get_repo_metadata(
             "tech-radar", "main"
         )
 
         self.assertEqual(cr, 0.3)
         self.assertEqual(age, 1.0)
         self.assertEqual(created_at, "2022-04-08T17:46:53Z")
+        self.assertEqual(len(commits), 9)
 
     @mock_s3
     @mock_sts
@@ -244,6 +246,14 @@ class GetData(unittest.TestCase):
                 "created_at": "2022-04-08T17:46:53Z",
                 "first_commit_date": "2022-04-08T17:46:53Z",
                 "last_commit_date": "2022-05-26T14:06:54Z",
+                "commits": [
+                            {
+                                'sha': 'checo11c005c284000bb83b0f120df9f452fe320',
+                                'commied_at': '2022-05-29 +0200',
+                                'author': 'Sergio Perez',
+                                'message': 'Monaco win',
+                            }
+                ],
             },
             "languages": {"python": 1000},
             "packages": [
@@ -273,6 +283,14 @@ class GetData(unittest.TestCase):
             created_at="2022-04-08T17:46:53Z",
             first_commit_date="2022-04-08T17:46:53Z",
             last_commit_date="2022-05-26T14:06:54Z",
+            commits=[
+                        {
+                            'sha': 'checo11c005c284000bb83b0f120df9f452fe320',
+                            'commied_at': '2022-05-29 +0200',
+                            'author': 'Sergio Perez',
+                            'message': 'Monaco win',
+                        }
+            ],
         )
 
         self.assertDictEqual(sbom_data, expected_output)
@@ -286,6 +304,7 @@ class GetData(unittest.TestCase):
                 "created_at": "2022-04-08T17:46:53Z",
                 "first_commit_date": "2022-04-08T17:46:53Z",
                 "last_commit_date": "2022-05-26T14:06:54Z",
+                "commits": [{}]
             },
             "languages": {"python": 1000},
             "packages": [
@@ -314,6 +333,7 @@ class GetData(unittest.TestCase):
             last_commit_date="2022-05-26T14:06:54Z",
             first_commit_date="2022-04-08T17:46:53Z",
             created_at="2022-04-08T17:46:53Z",
+            commits=[{}]
         )
 
         self.assertDictEqual(sbom_data, expected_output)
@@ -327,6 +347,14 @@ class GetData(unittest.TestCase):
                 "created_at": "2022-04-08T17:46:53Z",
                 "first_commit_date": "2022-04-08T17:46:53Z",
                 "last_commit_date": "2022-05-26T14:06:54Z",
+                "commits": [
+                            {
+                                'sha': 'checo11c005c284000bb83b0f120df9f452fe320',
+                                'commied_at': '2022-05-29 +0200',
+                                'author': 'Sergio Perez',
+                                'message': 'Monaco win',
+                            }
+                ]
             },
             "languages": {"python": 1000},
             "packages": [
@@ -355,6 +383,14 @@ class GetData(unittest.TestCase):
             created_at="2022-04-08T17:46:53Z",
             first_commit_date="2022-04-08T17:46:53Z",
             last_commit_date="2022-05-26T14:06:54Z",
+            commits=[
+                        {
+                            'sha': 'checo11c005c284000bb83b0f120df9f452fe320',
+                            'commied_at': '2022-05-29 +0200',
+                            'author': 'Sergio Perez',
+                            'message': 'Monaco win',
+                        }
+            ],
         )
 
         self.assertDictEqual(sbom_data, expected_output)
