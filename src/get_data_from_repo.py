@@ -335,10 +335,15 @@ def load_to_s3(repo: str, json_data: dict, bucket: str, role: str, ext_id: str) 
 
     json_df.write.mode("overwrite").parquet(repo +".parquet")
 
-    pq.write_to_dataset(
-        table,
-        f"s3://{bucket}/prod/cross_tech_radar/sbom/dt={date}/{repo}-{json_hash}.parquet"
-    )
+    table = pq.read_table(repo + ".parquet")
+
+    try:
+        pq.write_to_dataset(
+            table,
+            f"s3://{bucket}/prod/cross_tech_radar/sbom/dt={date}/{repo}-{json_hash}.parquet"
+        )
+    except OSError as e:
+        log.warn(e)
 
     log.debug("Sending process finished")
 

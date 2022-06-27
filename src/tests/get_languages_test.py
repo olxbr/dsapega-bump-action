@@ -1,6 +1,7 @@
 import datetime
 import unittest
 import boto3
+import json
 from git import GitCommandError
 
 from unittest.mock import patch
@@ -12,6 +13,22 @@ import get_data_from_repo
 
 import utils as test_utils
 
+json_obj = {
+    "metadata": {
+        "created_at": "2022-05-27",
+        "first_commit_date": "2022-06-01",
+        "last_commit_date": "2022-06-27",
+        "age": 1.83,
+        "commit_rate": 2,
+    },
+    "packages": [
+        ["@ant-design/colors", "5.0.1", "library", None],
+        ["@ant-design/icons", "4.4.0", "library", None]
+    ],
+    "languages": {
+        "Python": 3000
+    }
+}
 
 class GetData(unittest.TestCase):
     @patch(
@@ -154,7 +171,15 @@ class GetData(unittest.TestCase):
             "git rev-list main --", 128
         )
 
-        age, cr, created_at, commits = get_data_from_repo.get_repo_metadata(
+
+        (
+            age,
+            cr,
+            created_at,
+            first_commit_date,
+            last_commit_date,
+            commits,
+        )= get_data_from_repo.get_repo_metadata(
             "tech-radar", "main"
         )
 
@@ -178,7 +203,14 @@ class GetData(unittest.TestCase):
             mock_iterable_list.append(mock_iterable)
         mock_repo.iter_commits.return_value = mock_iterable_list
 
-        age, cr, created_at, commits = get_data_from_repo.get_repo_metadata(
+        (
+            age,
+            cr,
+            created_at,
+            first_commit_date,
+            last_commit_date,
+            commits,
+        )= get_data_from_repo.get_repo_metadata(
             "tech-radar", "main"
         )
 
@@ -191,13 +223,12 @@ class GetData(unittest.TestCase):
     @mock_sts
     def test_load_to_s3_with_assume_role_throws_exception_if_bucket_doesnt_exist(self):
         repo = "tech-radar"
-        json_data = '{"foo": "bar"}'
         bucket = "blackbox"
         role = "arn:aws:iam::000000000000:role/blackbox"
         ext_id = "00000000-0000-0000-0000-000000000000"
 
         with self.assertRaises(Exception) as context:
-            get_data_from_repo.load_to_s3(repo, json_data, bucket, role, ext_id)
+            get_data_from_repo.load_to_s3(repo, json_obj, bucket, role, ext_id)
 
         self.assertTrue("NoSuchBucket" in str(context.exception))
 
@@ -205,7 +236,6 @@ class GetData(unittest.TestCase):
     @mock_sts
     def test_load_to_s3_with_assume_role_throws_exception_if_role_is_invalid(self):
         repo = "tech-radar"
-        json_data = '{"foo": "bar"}'
         bucket = "blackbox"
         role = ""
         ext_id = ""
@@ -214,7 +244,7 @@ class GetData(unittest.TestCase):
         conn.create_bucket(Bucket="blackbox")
 
         with self.assertRaises(Exception) as context:
-            get_data_from_repo.load_to_s3(repo, json_data, bucket, role, ext_id)
+            get_data_from_repo.load_to_s3(repo, json_obj, bucket, role, ext_id)
 
         self.assertTrue("Parameter validation failed" in str(context.exception))
 
@@ -222,7 +252,6 @@ class GetData(unittest.TestCase):
     @mock_sts
     def test_load_to_s3_pushes_to_s3(self):
         repo = "tech-radar"
-        json_data = '{"foo": "bar"}'
         bucket = "blackbox"
         role = "arn:aws:iam::000000000000:role/blackbox"
         ext_id = "00000000-0000-0000-0000-000000000000"
@@ -231,11 +260,11 @@ class GetData(unittest.TestCase):
         conn.create_bucket(Bucket=bucket)
         s3_bucket = conn.Bucket(bucket)
 
-        get_data_from_repo.load_to_s3(repo, json_data, bucket, role, ext_id)
+        get_data_from_repo.load_to_s3(repo, json_obj, bucket, role, ext_id)
 
         for obj in s3_bucket.objects.all():
             key = obj.key
-            self.assertRegex(key, r'\d{4}-\d{2}-\d{2}-[-\w]+-\d{19}.json$')  # fmt: skip
+            self.assertRegex(key, r'\d{4}-\d{2}-\d{2}-[-\w]+-\d+.json$')  # fmt: skip
 
     def test_compressor(self):
         expected_output = {
