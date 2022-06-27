@@ -10,3 +10,5 @@ GitPython
 freezegun
 tqdm
 moto
+pyarrow
+pyspark
