@@ -7,6 +7,15 @@ import os
 import re
 import subprocess
 
+from pyspark.sql import SparkSession
+from pyspark.sql.types import *
+import pyspark.sql.functions as func
+
+from pyarrow import json as p_json
+import pyarrow as pa
+import pyarrow.parquet  as pq
+
+
 from git import Repo, GitCommandError
 
 from gh_api_requester import GHAPIRequests
@@ -16,12 +25,12 @@ logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
 
 requester = GHAPIRequests()
 repo = Repo()
+spark = SparkSession.builder.appName(repo).getOrCreate()
 
 TOKEN = os.getenv("GH_TOKEN", "")
 INTERVAL = 180  # Three months
 COMMIT_RATE_INTERVAL = 30  # Calculate commit rate per month
 BASE_URL = "https://api.github.com"
-
 
 def get_repo_languages(repo: str) -> dict:
     log.debug(f"Getting {repo} languages")
@@ -81,7 +90,7 @@ def get_commits_from_repo(default_branch: str = "main") -> list:
     commits_struct = [
             {
                 'sha': c.hexsha,
-                'commied_at': c.committed_datetime.strftime("%Y-%m-%d %z"),
+                'commited_at': c.committed_datetime.strftime("%Y-%m-%d %z"),
                 'author': c.author.name,
                 'commit_message': c.message,
             } for c in commits]
@@ -111,7 +120,7 @@ def get_repo_metadata(repo: str, default_branch: str) -> str:
     _, commits = get_commits_from_repo(default_branch)
     creation_date = get_creation_date(repo)
     commit_rate = get_repo_commit_rate(default_branch)
-    return age_in_months, commit_rate, creation_date, commits
+    return age_in_months, commit_rate, creation_date, first_commit_date, last_commit_date, commits
 
 
 def get_files_by_regex(regex: str = r"(.*?)", dir_to_check: str = "."):
@@ -220,7 +229,7 @@ def compressor(repo: str = "", **kwargs) -> dict:
     cr = kwargs.get("commit_rate", 0)
     languages = kwargs.get("languages", {})
     created_at = kwargs.get("created_at", None)
-    frist_commit_date = kwargs.get("first_commit_date", None)
+    first_commit_date = kwargs.get("first_commit_date", None)
     last_commit_date = kwargs.get("last_commit_date", None)
     commits = kwargs.get("commits", [{}])
     packages = kwargs.get(
@@ -234,7 +243,7 @@ def compressor(repo: str = "", **kwargs) -> dict:
             "age": age,
             "commit_rate": cr,
             "created_at": created_at,
-            "first_commit_date": frist_commit_date,
+            "first_commit_date": first_commit_date,
             "last_commit_date": last_commit_date,
             "commits": commits,
         },
@@ -268,6 +277,7 @@ def compressor(repo: str = "", **kwargs) -> dict:
 def load_to_s3(repo: str, json_data: dict, bucket: str, role: str, ext_id: str) -> None:
     log.info(f"Sendig SBOM to S3 to the bucket {bucket}")
     sts = boto3.client("sts")
+
     assume_role_response = sts.assume_role(
         RoleArn=role,
         RoleSessionName="blackbox-actions",
@@ -281,12 +291,60 @@ def load_to_s3(repo: str, json_data: dict, bucket: str, role: str, ext_id: str) 
         aws_secret_access_key=credentials["SecretAccessKey"],
         aws_session_token=credentials["SessionToken"],
     )
-    log.debug("Converting and sending object")
+
+    s3 = boto3.resource("s3")
+    log.info("Converting to JSON and sending object")
+    date = datetime.datetime.now().strftime("%Y-%m-%d")
+    json_data["coleta_dt"] = date
     json_obj = json.dumps(json_data).encode("UTF-8")
     json_hash = hash(json_obj)
-    date = datetime.datetime.now().strftime("%Y-%M-%d")
-    s3object = s3.Object(bucket, f"/tmp/{date}-{repo}-{json_hash}.json")
+    s3object = s3.Object(bucket, f"no-etl/jsons/{date}-{repo}-{json_hash}.json")
     s3object.put(Body=(json_obj))
+
+    log.info("Converting to parquet and sending object")
+    data = {
+        'coleta_dt': date,
+        'create_dt': json_data["metadata"]["created_at"],
+        'first_commit_dt': json_data["metadata"]["first_commit_date"],
+        'last_commit_dt': json_data["metadata"]["last_commit_date"],
+        'n_age': json_data["metadata"]["age"],
+        'n_commit_rate_last_3_mounth': json_data["metadata"]["commit_rate"],
+        'packages': json_data["packages"],
+        'repo_id': repo,
+        'languages': json_data["languages"],
+    }
+
+    with open('data.json', 'w') as outfile:
+        json.dump(data, outfile)
+    json_df = spark.read.json("data.json", multiLine=True,)
+
+    json_df = json_df \
+        .withColumn("coleta_dt",func.to_date("coleta_dt")) \
+        .withColumn("create_dt",func.to_date("create_dt")) \
+        .withColumn("first_commit_dt",func.to_date("first_commit_dt")) \
+        .withColumn("last_commit_dt",func.to_date("last_commit_dt"))
+
+    castStructToMap = func.udf(lambda langs: json.loads(langs), MapType(StringType(),LongType()))
+
+    json_df = json_df \
+        .withColumn("remapLang",castStructToMap(func.to_json('languages'))) \
+        .drop('languages').withColumnRenamed("remapLang","languages")
+
+    log.info('Parquet schema')
+    json_df.printSchema()
+
+    json_df.write.mode("overwrite").parquet(repo +".parquet")
+
+    table = pq.read_table(repo + ".parquet")
+
+    try:
+        pq.write_to_dataset(
+            table,
+            f"s3://{bucket}/prod/cross_tech_radar/sbom/dt={date}/{repo}-{json_hash}.parquet"
+        )
+    except OSError as e:
+        log.warn(e)
+
     log.debug("Sending process finished")
 
 
@@ -315,6 +373,8 @@ def process(
         age,
         cr,
         created_at,
+        first_commit_date,
+        last_commit_date,
         commits,
     ) = get_repo_metadata(repo, default_branch)
     log.info(f"The AGE is: {age}, The CR is: {cr}")
@@ -330,6 +390,8 @@ def process(
         packages=syft_output,
         created_at=created_at,
         commits=commits,
+        first_commit_date=first_commit_date,
+        last_commit_date=last_commit_date,
     )
     log.info("Sbom acquire process finished! Sending...")
     ext_id = kwargs.get("external_id", "")
