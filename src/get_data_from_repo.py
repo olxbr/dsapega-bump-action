@@ -309,7 +309,7 @@ def load_to_s3(repo: str, json_data: dict, bucket: str, role: str, ext_id: str) 
         'last_commit_dt': json_data["metadata"]["last_commit_date"],
         'n_age': json_data["metadata"]["age"],
         'n_commit_rate_last_3_mounth': json_data["metadata"]["commit_rate"],
-        'packages': json_data["packages"],
+        'packages': json_data["packages"] if json_data["packages"] > 0 else [{}],
         'repo_id': repo,
         'languages': json_data["languages"],
     }
@@ -331,10 +331,11 @@ def load_to_s3(repo: str, json_data: dict, bucket: str, role: str, ext_id: str) 
         .drop('languages').withColumnRenamed("remapLang","languages")
 
     log.info('Parquet schema')
-    json_df.printSchema()
 
     json_df.write.mode("overwrite").parquet(parquet_file)
     table = pq.read_table(parquet_file)
+    json_df.printSchema()
+    json_df.show()
     writer = pa.BufferOutputStream()
     pq.write_table(table, writer)
     body = bytes(writer.getvalue())
