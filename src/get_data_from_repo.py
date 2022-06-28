@@ -301,6 +301,7 @@ def load_to_s3(repo: str, json_data: dict, bucket: str, role: str, ext_id: str) 
     s3object.put(Body=(json_obj))
 
     log.info("Converting to parquet and sending object")
+    parquet_file = repo + ".parquet"
     data = {
         'coleta_dt': date,
         'create_dt': json_data["metadata"]["created_at"],
@@ -332,17 +333,13 @@ def load_to_s3(repo: str, json_data: dict, bucket: str, role: str, ext_id: str) 
     log.info('Parquet schema')
     json_df.printSchema()
 
-    json_df.write.mode("overwrite").parquet(repo +".parquet")
-
-    table = pq.read_table(repo + ".parquet")
-
-    try:
-        pq.write_to_dataset(
-            table,
-            f"s3://{bucket}/prod/cross_tech_radar/sbom/dt={date}/{repo}-{json_hash}.parquet"
-        )
-    except OSError as e:
-        log.warn(e)
+    json_df.write.mode("overwrite").parquet(parquet_file)
+    table = pq.read_table(parquet_file)
+    writer = pa.BufferOutputStream()
+    pq.write_table(table, writer)
+    body = bytes(writer.getvalue())
+    s3object = s3.Object(bucket, f"prod/cross_tech_radar/sbom/dt={date}/{repo}-{json_hash}.parquet")
+    s3object.put(Body=body)
 
     log.debug("Sending process finished")
 

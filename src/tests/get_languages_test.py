@@ -264,7 +264,7 @@ class GetData(unittest.TestCase):
 
         for obj in s3_bucket.objects.all():
             key = obj.key
-            self.assertRegex(key, r'\d{4}-\d{2}-\d{2}-[-\w]+-\d+.json$')  # fmt: skip
+            self.assertRegex(key, r'\d{4}-\d{2}-\d{2}-[-\w]+-\d+.parquet$')  # fmt: skip
 
     def test_compressor(self):
         expected_output = {
