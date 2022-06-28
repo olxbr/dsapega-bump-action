@@ -309,7 +309,7 @@ def load_to_s3(repo: str, json_data: dict, bucket: str, role: str, ext_id: str) 
         'last_commit_dt': json_data["metadata"]["last_commit_date"],
         'n_age': json_data["metadata"]["age"],
         'n_commit_rate_last_3_mounth': json_data["metadata"]["commit_rate"],
-        'packages': json_data["packages"] if json_data["packages"] > 0 else [{}],
+        'packages': json_data["packages"] if len(json_data["packages"])> 0 else [{}],
         'repo_id': repo,
         'languages': json_data["languages"],
     }
