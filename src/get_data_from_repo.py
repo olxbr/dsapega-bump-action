@@ -292,7 +292,6 @@ def load_to_s3(repo: str, json_data: dict, bucket: str, role: str, ext_id: str) 
         aws_session_token=credentials["SessionToken"],
     )
 
-    s3 = boto3.resource("s3")
     log.info("Converting to JSON and sending object")
     date = datetime.datetime.now().strftime("%Y-%m-%d")
     json_data["coleta_dt"] = date
