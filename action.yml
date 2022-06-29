@@ -1,17 +1,12 @@
-name: Black Box Action
-description: Action to retrieve metadata information from repository.
+name: "DSapega Bump Version"
+description: "Greet someone and record the time"
 inputs:
-  config:
-    description: Action configuration in JSON format.
+  version: # id of input
+    description: "version to be updated to"
     required: true
+outputs:
+  version: # id of output
+    description: "version updated"
 runs:
-  using: 'composite'
-  steps:
-    - uses: actions/checkout@v3
-    - uses: actions/setup-python@v3
-      with:
-        python-version: '3.9.12'
-    - run: pip install -r ${{ github.action_path }}/src/requirements.txt
-      shell: bash
-    - run: python ${{ github.action_path }}/src/entrypoint.py -c '${{ inputs.config }}'
-      shell: bash
+  using: "node16"
+  main: "index.js"
